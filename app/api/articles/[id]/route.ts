@@ -1,0 +1,113 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { markdownToHtml } from "@/lib/markdown";
+
+// GET /api/articles/[id] — fetch one article with its markers and links
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const article = await prisma.article.findUnique({
+    where: { id: params.id },
+    include: {
+      humanInputMarkers: true,
+      externalLinks: true,
+      internalLinks: { include: { targetArticle: true } },
+    },
+  });
+
+  if (!article) {
+    return NextResponse.json({ error: "Article not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ article });
+}
+
+// PATCH /api/articles/[id] — edit content, or resolve/unresolve a marker
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const body = await request.json();
+
+  if (body.action === "resolve_marker") {
+    await prisma.humanInputMarker.update({
+      where: { id: body.markerId },
+      data: { resolved: body.resolved, resolvedAt: body.resolved ? new Date() : null },
+    });
+    const article = await prisma.article.findUnique({
+      where: { id: params.id },
+      include: { humanInputMarkers: true },
+    });
+    return NextResponse.json({ article });
+  }
+
+  if (body.action === "edit_content") {
+    // Always (re)derive HTML from markdown server-side so WordPress never
+    // receives raw "##"/"**" — the previous bug shipped markdown as HTML.
+    const article = await prisma.article.update({
+      where: { id: params.id },
+      data: {
+        contentMarkdown: body.contentMarkdown,
+        contentHtml: markdownToHtml(body.contentMarkdown),
+        wordCount: body.contentMarkdown.trim().split(/\s+/).length,
+      },
+    });
+    await prisma.reviewLog.create({
+      data: {
+        articleId: params.id,
+        action: "edit",
+        timeSpentSeconds: body.timeSpentSeconds || 0,
+      },
+    });
+    return NextResponse.json({ article });
+  }
+
+  // WYSIWYG editor saves HTML directly (TipTap output is the source of truth).
+  if (body.action === "save_html") {
+    const html: string = body.contentHtml || "";
+    const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    const wordCount = text ? text.split(" ").length : 0;
+    const article = await prisma.article.update({
+      where: { id: params.id },
+      data: { contentHtml: html, wordCount },
+    });
+    await prisma.reviewLog.create({
+      data: {
+        articleId: params.id,
+        action: "edit",
+        timeSpentSeconds: body.timeSpentSeconds || 0,
+      },
+    });
+    return NextResponse.json({ article });
+  }
+
+  // Edit post metadata (title, SEO, tags) from the editor.
+  if (body.action === "update_meta") {
+    const data: Record<string, unknown> = {};
+    if (typeof body.title === "string") data.title = body.title;
+    if (typeof body.metaTitle === "string") data.metaTitle = body.metaTitle;
+    if (typeof body.metaDescription === "string")
+      data.metaDescription = body.metaDescription;
+    if (typeof body.primaryKeyword === "string")
+      data.primaryKeyword = body.primaryKeyword;
+    if (typeof body.tags === "string") data.tags = body.tags;
+    if (
+      typeof body.comparisonType === "string" &&
+      ["destination", "transport", "stay"].includes(body.comparisonType)
+    )
+      data.comparisonType = body.comparisonType;
+    const article = await prisma.article.update({
+      where: { id: params.id },
+      data,
+    });
+    return NextResponse.json({ article });
+  }
+
+  if (body.action === "delete") {
+    await prisma.article.delete({ where: { id: params.id } });
+    return NextResponse.json({ ok: true });
+  }
+
+  return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+}

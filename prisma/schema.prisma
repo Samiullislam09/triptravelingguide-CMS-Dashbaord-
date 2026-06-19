@@ -1,0 +1,130 @@
+// TripTravelingGuide AI Content Dashboard — Database Schema
+// Mirrors Section 17 of the AI Content Automation Blueprint PDF
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // SQLite for easy local development — zero setup needed.
+  // Swap to "postgresql" + a real DATABASE_URL when you move off your laptop.
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// NOTE: SQLite (Prisma) does not support native enums, so these are stored as
+// String. Allowed values are kept in sync with the app code:
+//   status         -> discovered | titled | drafted | seo_tagged | linked |
+//                     imaged | pending_review | approved | published
+//   comparisonType -> destination | transport | stay
+
+model Article {
+  id                String        @id @default(cuid())
+  title             String
+  slug              String        @unique
+  status            String        @default("discovered")
+  primaryKeyword    String
+  contentHtml       String        @default("")
+  contentMarkdown   String        @default("")
+  wordCount         Int           @default(0)
+  metaTitle         String        @default("")
+  metaDescription   String        @default("")
+  featuredImagePrompt String      @default("")
+  comparisonType    String
+  tags              String        @default("") // comma-separated SEO tags
+  reasoning         String        @default("") // AI's plain-language "why this topic"
+  titleAlternatives String        @default("") // JSON array of alternate headlines
+  source            String        @default("ai") // ai | manual — how the post was created
+  wordpressPostId   String?
+  wordpressUrl      String?
+
+  // Scoring snapshot at time of discovery (PDF Section 3.3)
+  topicScore        Float         @default(0)
+  searchVolumeLow   Int           @default(0)
+  searchVolumeHigh  Int           @default(0)
+  keywordDifficulty Int           @default(0)
+  trendDirection    String        @default("flat") // rising | flat | declining
+  intentLabel       String        @default("")
+
+  // SEO / quality checks (PDF Section 6.1)
+  readabilityScore  Int           @default(0)
+  duplicateScore    Int           @default(0)
+  internalLinkCount Int           @default(0)
+  externalLinkCount Int           @default(0)
+
+  createdAt         DateTime      @default(now())
+  approvedAt        DateTime?
+  publishedAt       DateTime?
+
+  humanInputMarkers HumanInputMarker[]
+  internalLinks     InternalLink[]      @relation("SourceArticle")
+  linkedFromArticles InternalLink[]     @relation("TargetArticle")
+  externalLinks     ExternalLink[]
+  analyticsSnapshots AnalyticsSnapshot[]
+  reviewLogs        ReviewLog[]
+}
+
+model HumanInputMarker {
+  id         String   @id @default(cuid())
+  articleId  String
+  article    Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  markerType String   // photo | price | experience | other
+  markerText String
+  resolved   Boolean  @default(false)
+  resolvedAt DateTime?
+  createdAt  DateTime @default(now())
+}
+
+model InternalLink {
+  id              String   @id @default(cuid())
+  articleId       String
+  article         Article  @relation("SourceArticle", fields: [articleId], references: [id], onDelete: Cascade)
+  targetArticleId String
+  targetArticle   Article  @relation("TargetArticle", fields: [targetArticleId], references: [id], onDelete: Cascade)
+  anchorText      String
+}
+
+model ExternalLink {
+  id                String   @id @default(cuid())
+  articleId         String
+  article           Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  url               String
+  anchorText        String
+  domain            String
+  statusCheckPassed Boolean  @default(false)
+  lastCheckedAt     DateTime?
+}
+
+model AnalyticsSnapshot {
+  id              String   @id @default(cuid())
+  articleId       String
+  article         Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  date            DateTime @default(now())
+  impressions     Int      @default(0)
+  clicks          Int      @default(0)
+  avgPosition     Float    @default(0)
+  sessions        Int      @default(0)
+  bounceRate      Float    @default(0)
+  adsenseRevenue  Float    @default(0)
+  adsenseRpm      Float    @default(0)
+  source          String   // gsc | ga4 | adsense
+}
+
+model ReviewLog {
+  id              String   @id @default(cuid())
+  articleId       String
+  article         Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  action          String   // edit | reject | approve
+  timeSpentSeconds Int     @default(0)
+  notes           String   @default("")
+  createdAt       DateTime @default(now())
+}
+
+model PublishSchedule {
+  id             String   @id @default(cuid())
+  articleId      String
+  scheduledFor   DateTime
+  weeklyCapBucket String
+  published      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+}

@@ -1,0 +1,39 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { discoverTopic } from "@/lib/contentPipeline";
+import { slugify } from "@/lib/markdown";
+
+// POST /api/topics/generate
+// Module 1 — runs topic discovery and creates a new Article row in "discovered" status.
+export async function POST() {
+  try {
+    const topic = await discoverTopic();
+
+    const slug = slugify(topic.title);
+
+    const article = await prisma.article.create({
+      data: {
+        title: topic.title,
+        slug: `${slug}-${Date.now().toString(36)}`,
+        status: "discovered",
+        primaryKeyword: topic.primaryKeyword,
+        comparisonType: topic.comparisonType,
+        topicScore: topic.topicScore,
+        searchVolumeLow: topic.searchVolumeLow,
+        searchVolumeHigh: topic.searchVolumeHigh,
+        keywordDifficulty: topic.keywordDifficulty,
+        trendDirection: topic.trendDirection,
+        intentLabel: topic.intentLabel,
+        reasoning: topic.reasoning,
+      },
+    });
+
+    return NextResponse.json({ article, reasoning: topic.reasoning });
+  } catch (error: any) {
+    console.error("Topic generation error:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to generate topic" },
+      { status: 500 }
+    );
+  }
+}
