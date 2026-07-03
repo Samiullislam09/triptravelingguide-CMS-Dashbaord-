@@ -6,14 +6,18 @@ generator client {
 }
 
 datasource db {
-  // SQLite for easy local development — zero setup needed.
-  // Swap to "postgresql" + a real DATABASE_URL when you move off your laptop.
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  // Postgres (Neon) — works both locally and on Vercel serverless.
+  // DATABASE_URL  = pooled connection string (used at runtime).
+  // DIRECT_URL    = direct (non-pooled) string (used by prisma migrate/db push).
+  // Both come from the Neon dashboard; see POSTGRES_SETUP.md.
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
-// NOTE: SQLite (Prisma) does not support native enums, so these are stored as
-// String. Allowed values are kept in sync with the app code:
+// NOTE: status/comparisonType are stored as String (not native enums) to keep
+// the app code simple and provider-agnostic. Allowed values are kept in sync
+// with the app code:
 //   status         -> discovered | titled | drafted | seo_tagged | linked |
 //                     imaged | pending_review | approved | published
 //   comparisonType -> destination | transport | stay
@@ -34,9 +38,20 @@ model Article {
   tags              String        @default("") // comma-separated SEO tags
   reasoning         String        @default("") // AI's plain-language "why this topic"
   titleAlternatives String        @default("") // JSON array of alternate headlines
-  source            String        @default("ai") // ai | manual — how the post was created
+  source            String        @default("ai") // ai | manual | wordpress — how the post was created
   wordpressPostId   String?
   wordpressUrl      String?
+
+  // Real taxonomy + media (populated by the WordPress migration / manual posts)
+  coverImageUrl     String        @default("")
+  coverImageAlt     String        @default("")
+  categoryName      String        @default("")
+  categorySlug      String        @default("")
+
+  // Content-quality recovery: thin/AI-fabricated posts get flagged for rewrite
+  // instead of being deleted. The dashboard surfaces these for human action.
+  needsRewrite      Boolean       @default(false)
+  qualityNote       String        @default("") // why it was flagged (word count, fabricated data, etc.)
 
   // Scoring snapshot at time of discovery (PDF Section 3.3)
   topicScore        Float         @default(0)

@@ -27,6 +27,8 @@ export async function middleware(request: NextRequest) {
   const isPublicPath =
     pathname === "/login" ||
     pathname === "/api/auth/login" ||
+    // Public, read-only content API consumed by the Vercel frontend.
+    pathname.startsWith("/api/public") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon");
 

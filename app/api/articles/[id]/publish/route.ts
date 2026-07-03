@@ -4,7 +4,11 @@ import { publishToWordPress } from "@/lib/wordpress";
 
 // POST /api/articles/[id]/publish
 // Module 8 — only allowed on articles already in "approved" status.
-// Creates the post on WordPress as a draft (second safety layer per PDF Section 10.1).
+//
+// The public Next.js frontend is the source of truth: it reads posts whose
+// `status = "published"` straight from this database. WordPress is now a
+// secondary, best-effort mirror (the site is migrating off it), so a WordPress
+// failure must NOT stop an approved article from going live on the frontend.
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -19,7 +23,7 @@ export async function POST(
   // be published directly once they have content.
   if (article.source !== "manual" && article.status !== "approved") {
     return NextResponse.json(
-      { error: "Article must be approved before it can be sent to WordPress." },
+      { error: "Article must be approved before it can be sent live." },
       { status: 422 }
     );
   }
@@ -31,7 +35,8 @@ export async function POST(
     );
   }
 
-  // Body decides draft vs live. Defaults to "draft" (PDF safety layer).
+  // Body decides the WordPress mirror mode (draft vs live). Defaults to "draft"
+  // (PDF safety layer). This only affects the WordPress copy, never our own DB.
   let mode: "draft" | "publish" = "draft";
   try {
     const body = await request.json();
@@ -40,6 +45,11 @@ export async function POST(
     // no body — keep default draft
   }
 
+  // Best-effort WordPress mirror. Never throws out of this block.
+  let wordpress:
+    | { postId: string; editUrl: string; mode: "draft" | "publish" }
+    | null = null;
+  let wordpressError: string | null = null;
   try {
     const result = await publishToWordPress({
       title: article.metaTitle || article.title,
@@ -54,23 +64,26 @@ export async function POST(
         metaDescription: article.metaDescription,
       },
     });
-
-    const updated = await prisma.article.update({
-      where: { id: params.id },
-      data: {
-        status: "published",
-        publishedAt: new Date(),
-        wordpressPostId: result.postId,
-        wordpressUrl: result.editUrl,
-      },
-    });
-
-    return NextResponse.json({ article: updated, wordpress: { ...result, mode } });
+    wordpress = { postId: result.postId, editUrl: result.editUrl, mode };
   } catch (error: any) {
-    console.error("WordPress publish error:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to publish to WordPress" },
-      { status: 500 }
-    );
+    // WordPress unreachable/retired — log and carry on. The article still goes
+    // live on the frontend below.
+    console.error("WordPress mirror failed (non-blocking):", error);
+    wordpressError = error?.message || "WordPress publish failed";
   }
+
+  // Mark published in OUR database — this is what makes the article visible on
+  // the public frontend, regardless of WordPress.
+  const updated = await prisma.article.update({
+    where: { id: params.id },
+    data: {
+      status: "published",
+      publishedAt: article.publishedAt ?? new Date(),
+      ...(wordpress
+        ? { wordpressPostId: wordpress.postId, wordpressUrl: wordpress.editUrl }
+        : {}),
+    },
+  });
+
+  return NextResponse.json({ article: updated, wordpress, wordpressError });
 }

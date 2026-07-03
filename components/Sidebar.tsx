@@ -2,19 +2,24 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Compass,
   LayoutGrid,
   BarChart3,
+  Inbox,
   Settings,
   LogOut,
   Menu,
   X,
+  type LucideIcon,
 } from "lucide-react";
 
-const ITEMS = [
+type NavItem = { href: string; label: string; icon: LucideIcon; badgeKey?: "inbox" };
+
+const ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Pipeline", icon: LayoutGrid },
+  { href: "/dashboard/inbox", label: "Inbox", icon: Inbox, badgeKey: "inbox" },
   { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
@@ -23,6 +28,28 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [inboxCount, setInboxCount] = useState(0);
+
+  // Poll the inbox summary so the badge reflects pending comments + new messages.
+  useEffect(() => {
+    let active = true;
+    async function loadCount() {
+      try {
+        const res = await fetch("/api/inbox/summary");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (active) setInboxCount((data.pendingComments ?? 0) + (data.newMessages ?? 0));
+      } catch {
+        /* ignore — badge is non-critical */
+      }
+    }
+    loadCount();
+    const timer = setInterval(loadCount, 60000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [pathname]);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -60,7 +87,12 @@ export default function Sidebar() {
                 <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-0.5 rounded-full bg-blue-400" />
               )}
               <Icon size={15} />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {item.badgeKey === "inbox" && inboxCount > 0 && (
+                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-blue-500 text-white text-[10px] font-bold">
+                  {inboxCount}
+                </span>
+              )}
             </Link>
           );
         })}
