@@ -9,6 +9,7 @@ import { Table } from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
+import { cn } from "@/components/ui";
 import {
   Bold,
   Italic,
@@ -33,6 +34,8 @@ import {
 /**
  * Professional WYSIWYG editor (TipTap) — the manual post writer.
  * Outputs clean HTML which is what we store and ship to WordPress / the Vercel site.
+ * Light-glass theme — TipTap logic/extensions are unchanged, only the chrome
+ * around it was restyled to match the rest of the command center.
  */
 export default function RichEditor({
   initialHtml,
@@ -69,15 +72,13 @@ export default function RichEditor({
   });
 
   if (!editor) {
-    return (
-      <div className="min-h-[480px] bg-ink-800/40 rounded-lg animate-pulse" />
-    );
+    return <div className="min-h-[480px] bg-white/60 rounded-2xl skeleton" />;
   }
 
   return (
-    <div className="border border-ink-600 rounded-xl overflow-hidden bg-ink-950/40">
+    <div className="border border-line rounded-2xl overflow-hidden bg-white/80 backdrop-blur-sm shadow-glass">
       <Toolbar editor={editor} />
-      <div className="px-4 py-3 max-h-[70vh] overflow-y-auto">
+      <div className="px-5 py-4 max-h-[70vh] overflow-y-auto">
         <EditorContent editor={editor} />
       </div>
     </div>
@@ -104,7 +105,7 @@ function Toolbar({ editor }: { editor: Editor }) {
   const inTable = editor.isActive("table");
 
   return (
-    <div className="flex flex-wrap items-center gap-0.5 px-2 py-1.5 border-b border-ink-700 bg-ink-900 sticky top-0 z-10">
+    <div className="flex flex-wrap items-center gap-0.5 px-2.5 py-2 border-b border-line bg-white/90 sticky top-0 z-10">
       <Btn on={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive("heading", { level: 1 })} title="Heading 1"><Heading1 size={15} /></Btn>
       <Btn on={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive("heading", { level: 2 })} title="Heading 2"><Heading2 size={15} /></Btn>
       <Btn on={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive("heading", { level: 3 })} title="Heading 3"><Heading3 size={15} /></Btn>
@@ -151,11 +152,10 @@ function Btn({
       type="button"
       onClick={on}
       title={title}
-      className={`p-1.5 rounded-md transition ${
-        active
-          ? "bg-blue-500/20 text-blue-300"
-          : "text-gray-400 hover:text-white hover:bg-ink-800"
-      }`}
+      className={cn(
+        "p-1.5 rounded-lg transition",
+        active ? "bg-brand-50 text-brand-600" : "text-slate-400 hover:text-ink hover:bg-slate-100"
+      )}
     >
       {children}
     </button>
@@ -163,5 +163,5 @@ function Btn({
 }
 
 function Sep() {
-  return <span className="w-px h-5 bg-ink-700 mx-1" />;
+  return <span className="w-px h-5 bg-line mx-1" />;
 }

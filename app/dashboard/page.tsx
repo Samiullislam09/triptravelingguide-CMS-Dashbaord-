@@ -1,384 +1,321 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import Sidebar from "@/components/Sidebar";
-import StatusBadge from "@/components/StatusBadge";
-import TopicInsight from "@/components/TopicInsight";
-import ActivityHistory from "@/components/ActivityHistory";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Sparkles,
-  TrendingUp,
+  Card,
+  StatCard,
+  SectionHeader,
+  Button,
+  Badge,
+  Spinner,
+  EmptyState,
+  Skeleton,
+  cn,
+} from "@/components/ui";
+import {
   FileText,
-  AlertTriangle,
-  ArrowRight,
-  Loader2,
-  Compass,
+  Send,
+  MousePointerClick,
+  Gauge,
+  Sparkles,
   PenLine,
+  Compass,
   Eye,
   CheckCircle2,
-  Send,
+  TrendingUp,
+  Clapperboard,
+  AlertTriangle,
+  ArrowRight,
+  Link2,
+  Search,
 } from "lucide-react";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  Tooltip,
+  CartesianGrid,
+} from "recharts";
 
-interface Article {
-  id: string;
-  title: string;
-  status: string;
-  primaryKeyword: string;
-  comparisonType: string;
-  topicScore: number;
-  searchVolumeLow: number;
-  searchVolumeHigh: number;
-  keywordDifficulty: number;
-  trendDirection: string;
-  intentLabel: string;
-  reasoning?: string;
-  wordCount: number;
-  humanInputMarkers: { resolved: boolean }[];
-  createdAt: string;
+interface Overview {
+  counts: { total: number; published: number; needsRewrite: number; stories: number };
+  pipeline: Record<string, number>;
+  series: { date: string; label: string; created: number; published: number }[];
+  gscConnected: boolean;
+  search: { clicks: number; impressions: number; avgPosition: number; pagesTracked: number } | null;
+  todaysPicks: { query: string; page: string; clicks: number; impressions: number; position: number }[];
+  recent: { id: string; title: string; status: string; needsRewrite: boolean; coverImageUrl: string }[];
 }
 
 const STAGES = [
-  { key: "discovered", label: "Discovered", icon: Compass, color: "text-gray-300" },
-  { key: "drafted", label: "Drafted", icon: PenLine, color: "text-blue-400" },
-  { key: "pending_review", label: "Pending review", icon: Eye, color: "text-amber-400" },
-  { key: "approved", label: "Approved", icon: CheckCircle2, color: "text-green-400" },
-  { key: "published", label: "Published", icon: Send, color: "text-emerald-400" },
+  { key: "discovered", label: "Discovered", icon: Compass, tone: "neutral" as const },
+  { key: "drafted", label: "Drafted", icon: PenLine, tone: "brand" as const },
+  { key: "pending_review", label: "In review", icon: Eye, tone: "warn" as const },
+  { key: "approved", label: "Approved", icon: CheckCircle2, tone: "success" as const },
+  { key: "published", label: "Published", icon: Send, tone: "success" as const },
 ];
 
-export default function DashboardPage() {
+export default function OverviewPage() {
   const router = useRouter();
-  const [articles, setArticles] = useState<Article[]>([]);
+  const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
-  const [generatingTopic, setGeneratingTopic] = useState(false);
-  const [generatingDraftId, setGeneratingDraftId] = useState<string | null>(null);
-  const [creatingManual, setCreatingManual] = useState(false);
-  const [error, setError] = useState("");
-
-  async function handleCreateManual() {
-    setError("");
-    setCreatingManual(true);
-    try {
-      const res = await fetch("/api/articles/create-manual", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: "Untitled post" }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to create post");
-      router.push(`/review/${data.article.id}`);
-    } catch (e: any) {
-      setError(e.message);
-      setCreatingManual(false);
-    }
-  }
-
-  const fetchArticles = useCallback(async () => {
-    const res = await fetch("/api/articles");
-    const data = await res.json();
-    if (res.ok) setArticles(data.articles);
-    setLoading(false);
-  }, []);
 
   useEffect(() => {
-    fetchArticles();
-  }, [fetchArticles]);
+    fetch("/api/overview")
+      .then((r) => r.json())
+      .then((d) => setData(d))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
-  async function handleGenerateTopic() {
-    setError("");
-    setGeneratingTopic(true);
-    try {
-      const res = await fetch("/api/topics/generate", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      await fetchArticles();
-    } catch (e: any) {
-      setError(e.message || "Failed to generate topic");
-    } finally {
-      setGeneratingTopic(false);
-    }
-  }
-
-  async function handleGenerateDraft(id: string) {
-    setError("");
-    setGeneratingDraftId(id);
-    try {
-      const res = await fetch(`/api/articles/${id}/generate-draft`, {
-        method: "POST",
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      await fetchArticles();
-    } catch (e: any) {
-      setError(e.message || "Failed to generate draft");
-    } finally {
-      setGeneratingDraftId(null);
-    }
-  }
-
-  const stageCounts = STAGES.reduce((acc, stage) => {
-    acc[stage.key] = articles.filter((a) =>
-      stage.key === "discovered"
-        ? ["discovered", "titled"].includes(a.status)
-        : stage.key === "drafted"
-        ? ["drafted", "seo_tagged", "linked", "imaged"].includes(a.status)
-        : a.status === stage.key
-    ).length;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const newTopics = articles.filter((a) =>
-    ["discovered", "titled"].includes(a.status)
-  );
-  const pendingReview = articles.filter((a) => a.status === "pending_review");
-  const others = articles.filter(
-    (a) => !["discovered", "titled", "pending_review"].includes(a.status)
-  );
+  const fmt = (n: number) => n.toLocaleString("en-US");
+  const publishedSpark = data?.series.map((s) => s.published) ?? [];
+  const createdSpark = data?.series.map((s) => s.created) ?? [];
 
   return (
-    <div className="md:flex">
-      <Sidebar />
-      <main className="flex-1 px-4 py-5 sm:px-6 md:px-10 md:py-8 max-w-6xl mx-auto w-full">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6 animate-fade-up">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Content pipeline
-            </h1>
-            <p className="text-sm text-gray-400 mt-1">
-              AI discovers the topic &amp; keyword, writes an SEO draft, and shows
-              you <span className="text-gray-300">exactly why</span> — you review
-              and approve.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleCreateManual}
-              disabled={creatingManual}
-              className="inline-flex items-center justify-center gap-2 bg-ink-800 hover:bg-ink-700 border border-ink-600 disabled:opacity-50 transition rounded-lg px-4 py-2.5 text-sm font-medium whitespace-nowrap"
-            >
-              {creatingManual ? (
-                <Loader2 size={15} className="animate-spin" />
-              ) : (
-                <PenLine size={15} />
-              )}
-              Write post
-            </button>
-            <button
-              onClick={handleGenerateTopic}
-              disabled={generatingTopic}
-              className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:opacity-50 transition rounded-lg px-4 py-2.5 text-sm font-medium shadow-lg shadow-blue-600/20 whitespace-nowrap"
-            >
-              {generatingTopic ? (
-                <Loader2 size={15} className="animate-spin" />
-              ) : (
-                <Sparkles size={15} />
-              )}
-              {generatingTopic ? "AI is researching…" : "Generate topic"}
-            </button>
-          </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 animate-fade-up">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-ink">Overview</h1>
+          <p className="text-sm text-muted mt-1">
+            Your content engine &amp; search performance at a glance.
+          </p>
         </div>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" icon={PenLine} onClick={() => router.push("/dashboard/content")}>
+            Write post
+          </Button>
+          <Button variant="ai" icon={Sparkles} onClick={() => router.push("/dashboard/ai")}>
+            AI Studio
+          </Button>
+        </div>
+      </div>
 
-        {error && (
-          <div className="mb-5 text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 animate-fade-up">
-            {error}
+      {/* GSC connect banner */}
+      {!loading && data && !data.gscConnected && (
+        <div className="glass p-4 flex flex-col sm:flex-row sm:items-center gap-3 border-brand-200 animate-fade-up">
+          <span className="grid place-items-center h-10 w-10 rounded-xl bg-brand-50 text-brand-600 shrink-0">
+            <Search size={18} />
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-ink text-sm">Connect Google Search Console for real data</div>
+            <div className="text-sm text-muted">
+              Clicks, impressions, ranking positions &amp; "which keyword to write next" — all go live once connected.
+            </div>
           </div>
-        )}
+          <Button variant="soft" icon={Link2} onClick={() => router.push("/dashboard/settings")}>
+            Connect GSC
+          </Button>
+        </div>
+      )}
 
-        {/* Pipeline funnel */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
-          {STAGES.map((s, i) => {
-            const Icon = s.icon;
-            const count = stageCounts[s.key] || 0;
-            return (
-              <div
-                key={s.key}
-                className="relative bg-ink-900 border border-ink-700 rounded-xl px-4 py-3.5 overflow-hidden animate-fade-up hover:border-ink-600 transition"
-                style={{ animationDelay: `${i * 60}ms` }}
-              >
-                <div className="flex items-center justify-between">
-                  <Icon size={16} className={s.color} />
-                  <span className="text-2xl font-semibold tabular-nums">
-                    {count}
-                  </span>
-                </div>
-                <div className="text-xs text-gray-400 mt-1.5">{s.label}</div>
-                {i < STAGES.length - 1 && (
-                  <ArrowRight
-                    size={12}
-                    className="hidden lg:block absolute -right-[7px] top-1/2 -translate-y-1/2 text-ink-600 z-10"
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {loading ? (
+          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28" />)
+        ) : (
+          <>
+            <StatCard
+              label="Total posts"
+              value={fmt(data?.counts.total ?? 0)}
+              icon={FileText}
+              accent="brand"
+              spark={createdSpark}
+              delay={0}
+            />
+            <StatCard
+              label="Published"
+              value={fmt(data?.counts.published ?? 0)}
+              icon={Send}
+              accent="success"
+              spark={publishedSpark}
+              delay={60}
+            />
+            <StatCard
+              label="Search clicks (28d)"
+              value={data?.search ? fmt(data.search.clicks) : "—"}
+              icon={MousePointerClick}
+              accent="ai"
+              delay={120}
+            />
+            <StatCard
+              label="Avg. position"
+              value={data?.search ? data.search.avgPosition : "—"}
+              icon={Gauge}
+              accent="warn"
+              delay={180}
+            />
+          </>
+        )}
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Activity chart */}
+        <Card className="lg:col-span-2" delay={80}>
+          <SectionHeader
+            title="Publishing activity"
+            subtitle="Last 14 days"
+            icon={TrendingUp}
+          />
+          {loading ? (
+            <Skeleton className="h-56" />
+          ) : (
+            <div className="h-56 -ml-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={data?.series ?? []} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                  <defs>
+                    <linearGradient id="gCreated" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#3b6cf6" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="#3b6cf6" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="gPublished" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#16a34a" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="#16a34a" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#eef1f7" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: 12,
+                      border: "1px solid #e6e9f0",
+                      boxShadow: "0 8px 24px -8px rgba(15,23,42,0.15)",
+                      fontSize: 12,
+                    }}
                   />
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  <Area type="monotone" dataKey="created" stroke="#3b6cf6" strokeWidth={2} fill="url(#gCreated)" name="Created" />
+                  <Area type="monotone" dataKey="published" stroke="#16a34a" strokeWidth={2} fill="url(#gPublished)" name="Published" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </Card>
 
-        {/* Daily activity history */}
-        <div className="mb-8">
-          <ActivityHistory />
-        </div>
-
-        {loading && (
-          <div className="text-sm text-gray-400 flex items-center gap-2">
-            <Loader2 size={14} className="animate-spin" /> Loading articles…
+        {/* Content pipeline */}
+        <Card delay={140}>
+          <SectionHeader title="Content pipeline" icon={FileText} />
+          <div className="space-y-2.5">
+            {STAGES.map((s) => {
+              const Icon = s.icon;
+              const count = data?.pipeline[s.key] ?? 0;
+              return (
+                <div key={s.key} className="flex items-center gap-3">
+                  <span className="grid place-items-center h-8 w-8 rounded-lg bg-slate-50 text-slate-500">
+                    <Icon size={15} />
+                  </span>
+                  <span className="text-sm text-slate-600 flex-1">{s.label}</span>
+                  <span className="text-lg font-bold tabular-nums text-ink">{loading ? "–" : count}</span>
+                </div>
+              );
+            })}
           </div>
-        )}
-
-        {!loading && articles.length === 0 && (
-          <div className="text-center py-16 border border-dashed border-ink-700 rounded-xl animate-fade-up">
-            <Sparkles className="mx-auto text-blue-400/60 mb-3" size={28} />
-            <p className="text-sm text-gray-400 mb-4">
-              No topics yet. Let the AI find the first one.
-            </p>
+          {!loading && (data?.counts.needsRewrite ?? 0) > 0 && (
             <button
-              onClick={handleGenerateTopic}
-              disabled={generatingTopic}
-              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 transition rounded-lg px-4 py-2 text-sm font-medium"
+              onClick={() => router.push("/dashboard/content?filter=needsRewrite")}
+              className="mt-4 w-full flex items-center gap-2 rounded-xl bg-warn-soft text-warn px-3 py-2.5 text-sm font-medium hover:brightness-95 transition"
             >
-              <Sparkles size={14} /> Generate first topic
+              <AlertTriangle size={15} />
+              {data?.counts.needsRewrite} posts need rewrite
+              <ArrowRight size={14} className="ml-auto" />
             </button>
+          )}
+        </Card>
+      </div>
+
+      {/* Today's pick — keyword opportunities */}
+      <Card delay={100}>
+        <SectionHeader
+          title="Today's pick — keyword opportunities"
+          subtitle="Pages ranking on the edge of page 1 — a small push wins big"
+          icon={TrendingUp}
+          action={
+            <Button variant="ai" icon={Sparkles} onClick={() => router.push("/dashboard/ai")}>
+              Write with AI
+            </Button>
+          }
+        />
+        {loading ? (
+          <Skeleton className="h-32" />
+        ) : data?.todaysPicks.length ? (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {data.todaysPicks.map((p, i) => (
+              <div key={i} className="rounded-xl border border-line bg-white/60 p-3.5 glass-hover">
+                <div className="flex items-center justify-between mb-1.5">
+                  <Badge tone="brand">#{p.position}</Badge>
+                  <span className="text-xs text-muted">{fmt(p.impressions)} impr.</span>
+                </div>
+                <div className="text-sm font-medium text-ink line-clamp-2">{p.query}</div>
+                <div className="text-xs text-muted mt-1">{p.clicks} clicks · pos {p.position}</div>
+              </div>
+            ))}
           </div>
+        ) : (
+          <EmptyState
+            icon={Search}
+            title={data?.gscConnected ? "No opportunities yet" : "Connect Search Console"}
+            hint={
+              data?.gscConnected
+                ? "Once you have pages ranking on page 1–3, they'll show here as quick wins."
+                : "Real keyword opportunities (which post to write next) appear here after you connect GSC in Settings."
+            }
+            action={
+              !data?.gscConnected && (
+                <Button variant="soft" icon={Link2} onClick={() => router.push("/dashboard/settings")}>
+                  Connect GSC
+                </Button>
+              )
+            }
+          />
         )}
+      </Card>
 
-        {/* New topics */}
-        {newTopics.length > 0 && (
-          <section className="mb-8">
-            <h2 className="text-sm font-medium text-gray-300 mb-3 flex items-center gap-2">
-              <Compass size={14} className="text-blue-400" />
-              New topics — ready for AI to write
-            </h2>
-            <div className="space-y-4">
-              {newTopics.map((a, idx) => (
-                <div
-                  key={a.id}
-                  className="bg-ink-900 border border-ink-700 rounded-xl p-4 sm:p-5 animate-fade-up"
-                  style={{ animationDelay: `${idx * 60}ms` }}
-                >
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                        <StatusBadge status={a.status} />
-                        <span className="text-xs px-2 py-0.5 rounded-md bg-ink-800 text-gray-400 capitalize">
-                          {a.comparisonType}
-                        </span>
-                        {a.trendDirection === "rising" && (
-                          <span className="inline-flex items-center gap-1 text-xs text-green-400">
-                            <TrendingUp size={11} /> Rising
-                          </span>
-                        )}
-                        <span className="inline-flex items-center gap-1 text-xs text-blue-300">
-                          Score {a.topicScore}/100
-                        </span>
-                      </div>
-                      <div className="text-base sm:text-lg font-medium leading-snug">
-                        {a.title}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mb-3">
-                    <TopicInsight article={a} />
-                  </div>
-
-                  <button
-                    onClick={() => handleGenerateDraft(a.id)}
-                    disabled={generatingDraftId === a.id}
-                    className="inline-flex items-center gap-2 bg-ink-800 hover:bg-ink-700 border border-ink-600 disabled:opacity-50 transition rounded-lg px-3.5 py-2 text-sm font-medium"
-                  >
-                    {generatingDraftId === a.id ? (
-                      <>
-                        <Loader2 size={14} className="animate-spin" />
-                        Writing 700+ word draft…
-                      </>
-                    ) : (
-                      <>
-                        <FileText size={14} /> Generate title, draft &amp; SEO
-                      </>
-                    )}
-                  </button>
-                </div>
-              ))}
-            </div>
-          </section>
+      {/* Recent posts */}
+      <Card delay={120}>
+        <SectionHeader
+          title="Recent posts"
+          icon={FileText}
+          action={
+            <Button variant="ghost" onClick={() => router.push("/dashboard/content")}>
+              View all
+            </Button>
+          }
+        />
+        {loading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14" />)}
+          </div>
+        ) : data?.recent.length ? (
+          <div className="space-y-1.5">
+            {data.recent.map((a) => (
+              <button
+                key={a.id}
+                onClick={() => router.push(`/review/${a.id}`)}
+                className="w-full text-left flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-white/70 transition group"
+              >
+                <span
+                  className={cn(
+                    "h-10 w-10 rounded-lg bg-cover bg-center shrink-0 bg-slate-100",
+                  )}
+                  style={a.coverImageUrl ? { backgroundImage: `url(${a.coverImageUrl})` } : undefined}
+                />
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm font-medium text-ink truncate">{a.title}</span>
+                  <span className="flex items-center gap-2 mt-0.5">
+                    <Badge tone={a.status === "published" ? "success" : "neutral"}>{a.status}</Badge>
+                    {a.needsRewrite && <Badge tone="warn" icon={AlertTriangle}>rewrite</Badge>}
+                  </span>
+                </span>
+                <ArrowRight size={16} className="text-slate-300 group-hover:text-brand-500 group-hover:translate-x-0.5 transition" />
+              </button>
+            ))}
+          </div>
+        ) : (
+          <EmptyState icon={Sparkles} title="No posts yet" hint="Generate your first article with AI Studio." />
         )}
-
-        {/* Pending review */}
-        {pendingReview.length > 0 && (
-          <section className="mb-8">
-            <h2 className="text-sm font-medium text-gray-300 mb-3 flex items-center gap-2">
-              <Eye size={14} className="text-amber-400" />
-              Waiting for your review
-            </h2>
-            <div className="space-y-2">
-              {pendingReview.map((a) => {
-                const unresolvedCount = a.humanInputMarkers.filter(
-                  (m) => !m.resolved
-                ).length;
-                return (
-                  <button
-                    key={a.id}
-                    onClick={() => router.push(`/review/${a.id}`)}
-                    className="w-full text-left bg-ink-900 border border-ink-700 hover:border-blue-500/40 rounded-xl p-4 transition flex items-center justify-between gap-3 group"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <StatusBadge status={a.status} />
-                        <span className="text-xs text-gray-500">
-                          {a.wordCount} words
-                        </span>
-                      </div>
-                      <div className="text-sm font-medium">{a.title}</div>
-                      {unresolvedCount > 0 && (
-                        <div className="flex items-center gap-1 text-xs text-amber-400 mt-1">
-                          <AlertTriangle size={11} />
-                          {unresolvedCount} marker{unresolvedCount > 1 ? "s" : ""} need
-                          attention
-                        </div>
-                      )}
-                    </div>
-                    <ArrowRight
-                      size={16}
-                      className="text-gray-500 shrink-0 group-hover:translate-x-0.5 group-hover:text-blue-400 transition"
-                    />
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {/* Approved & published */}
-        {others.length > 0 && (
-          <section>
-            <h2 className="text-sm font-medium text-gray-300 mb-3 flex items-center gap-2">
-              <Send size={14} className="text-emerald-400" />
-              Approved &amp; published
-            </h2>
-            <div className="space-y-2">
-              {others.map((a) => (
-                <div
-                  key={a.id}
-                  className="bg-ink-900 border border-ink-700 rounded-xl p-4 flex items-center justify-between gap-3"
-                >
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <StatusBadge status={a.status} />
-                    </div>
-                    <div className="text-sm font-medium">{a.title}</div>
-                  </div>
-                  <button
-                    onClick={() => router.push(`/review/${a.id}`)}
-                    className="text-xs bg-ink-800 hover:bg-ink-700 border border-ink-600 rounded-lg px-3 py-1.5 shrink-0"
-                  >
-                    {a.status === "approved" ? "Publish to WordPress" : "View"}
-                  </button>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-      </main>
+      </Card>
     </div>
   );
 }

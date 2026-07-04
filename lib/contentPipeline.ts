@@ -25,9 +25,15 @@ export interface DiscoveredTopic {
  * these numbers are AI estimates, not verified search data, unless you've
  * wired in a real keyword API.
  */
-export async function discoverTopic(): Promise<DiscoveredTopic> {
-  const prompt = `You are a travel SEO strategist for TripTravelingGuide.com, a site for USA and Canada travelers.
+export async function discoverTopic(seed?: string): Promise<DiscoveredTopic> {
+  // When the user types a topic/keyword in AI Studio we steer discovery toward it;
+  // otherwise the model researches a trending topic on its own.
+  const seedLine = seed && seed.trim()
+    ? `\nThe user specifically wants a topic about: "${seed.trim()}". Build the topic around this — keep their intent, refine it into the strongest rankable comparison angle.\n`
+    : "";
 
+  const prompt = `You are a travel SEO strategist for TripTravelingGuide.com, a site for USA and Canada travelers.
+${seedLine}
 Propose ONE comparison article topic (Destination vs Destination, Train vs Flight, Cruise vs Resort, Hotel vs Airbnb, or City vs City for a trip type). Pick something genuinely useful and timely for June 2026.
 
 Respond with ONLY valid JSON, no markdown fences, in this exact shape:

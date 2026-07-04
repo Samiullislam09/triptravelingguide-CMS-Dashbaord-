@@ -2,24 +2,25 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Sidebar from "@/components/Sidebar";
-import StatusBadge from "@/components/StatusBadge";
-import TopicInsight from "@/components/TopicInsight";
 import RichEditor from "@/components/RichEditor";
+import { Button, Badge, Spinner, cn } from "@/components/ui";
+import type { LucideIcon } from "lucide-react";
 import {
   AlertTriangle,
   CheckCircle2,
   Circle,
   Loader2,
   Image as ImageIcon,
-  FileEdit,
   Globe,
   Tag,
   ArrowLeft,
   Check,
   Sparkles,
   PenLine,
-  Trash2,
+  Clapperboard,
+  ExternalLink,
+  FolderOpen,
+  Search,
 } from "lucide-react";
 
 interface Marker {
@@ -32,6 +33,7 @@ interface Marker {
 interface Article {
   id: string;
   title: string;
+  slug: string;
   status: string;
   source: string;
   primaryKeyword: string;
@@ -40,17 +42,14 @@ interface Article {
   wordCount: number;
   metaTitle: string;
   metaDescription: string;
-  featuredImagePrompt: string;
-  readabilityScore: number;
-  topicScore: number;
   comparisonType: string;
-  searchVolumeLow: number;
-  searchVolumeHigh: number;
-  keywordDifficulty: number;
-  trendDirection: string;
-  intentLabel: string;
-  reasoning?: string;
   tags?: string;
+  categoryName: string;
+  categorySlug: string;
+  coverImageUrl: string;
+  thumbnailUrl: string;
+  thumbnailStatus: string;
+  needsRewrite: boolean;
   humanInputMarkers: Marker[];
   wordpressUrl?: string | null;
 }
@@ -69,10 +68,21 @@ export default function EditorPage() {
   // editable fields
   const [title, setTitle] = useState("");
   const [html, setHtml] = useState("");
+  const [metaTitle, setMetaTitle] = useState("");
   const [metaDescription, setMetaDescription] = useState("");
+  const [slug, setSlug] = useState("");
   const [primaryKeyword, setPrimaryKeyword] = useState("");
   const [tags, setTags] = useState("");
+  const [categoryName, setCategoryName] = useState("");
+  const [categorySlug, setCategorySlug] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
+
+  // thumbnail / story local UI state
+  const [thumbPreview, setThumbPreview] = useState("");
+  const [genThumb, setGenThumb] = useState(false);
+  const [approveThumb, setApproveThumb] = useState(false);
+  const [genStory, setGenStory] = useState(false);
+  const [storyDone, setStoryDone] = useState(false);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirtyRef = useRef(false);
@@ -85,9 +95,14 @@ export default function EditorPage() {
       setArticle(a);
       setTitle(a.title);
       setHtml(a.contentHtml);
+      setMetaTitle(a.metaTitle || a.title);
       setMetaDescription(a.metaDescription);
+      setSlug(a.slug || "");
       setPrimaryKeyword(a.primaryKeyword);
       setTags(a.tags || "");
+      setCategoryName(a.categoryName || "");
+      setCategorySlug(a.categorySlug || "");
+      setThumbPreview(a.thumbnailUrl || "");
     }
     setLoading(false);
   }, [id]);
@@ -109,7 +124,7 @@ export default function EditorPage() {
       body: JSON.stringify({
         action: "update_meta",
         title,
-        metaTitle: title,
+        metaTitle: metaTitle || title,
         metaDescription,
         primaryKeyword,
         tags,
@@ -117,7 +132,7 @@ export default function EditorPage() {
     });
     dirtyRef.current = false;
     setSaveState("saved");
-  }, [id, html, title, metaDescription, primaryKeyword, tags]);
+  }, [id, html, title, metaTitle, metaDescription, primaryKeyword, tags]);
 
   // Debounced autosave whenever an editable field changes.
   function markDirty() {
@@ -180,34 +195,69 @@ export default function EditorPage() {
     }
   }
 
-  async function handleDelete() {
-    if (!window.confirm("Delete this post permanently?")) return;
-    await fetch(`/api/articles/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "delete" }),
-    });
-    router.push("/dashboard");
+  async function handleGenerateThumbnail() {
+    setError("");
+    setGenThumb(true);
+    try {
+      const res = await fetch(`/api/articles/${id}/thumbnail`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Failed to generate thumbnail");
+        return;
+      }
+      // Cache-bust so the freshly uploaded image shows immediately.
+      setThumbPreview(`${data.url}?t=${Date.now()}`);
+      fetchArticle();
+    } finally {
+      setGenThumb(false);
+    }
+  }
+
+  async function handleApproveThumbnail() {
+    setError("");
+    setApproveThumb(true);
+    try {
+      const res = await fetch(`/api/articles/${id}/thumbnail/approve`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Failed to approve thumbnail");
+        return;
+      }
+      fetchArticle();
+    } finally {
+      setApproveThumb(false);
+    }
+  }
+
+  async function handleGenerateStory() {
+    setError("");
+    setGenStory(true);
+    setStoryDone(false);
+    try {
+      const res = await fetch(`/api/articles/${id}/story`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Failed to generate web story");
+        return;
+      }
+      setStoryDone(true);
+    } finally {
+      setGenStory(false);
+    }
   }
 
   if (loading) {
     return (
-      <div className="md:flex">
-        <Sidebar />
-        <main className="flex-1 px-6 py-8 text-sm text-gray-400 flex items-center gap-2">
-          <Loader2 size={14} className="animate-spin" /> Loading…
-        </main>
+      <div className="min-h-screen grid place-items-center">
+        <Spinner label="Loading editor…" />
       </div>
     );
   }
 
   if (!article) {
     return (
-      <div className="md:flex">
-        <Sidebar />
-        <main className="flex-1 px-6 py-8 text-sm text-gray-400">
-          Post not found.
-        </main>
+      <div className="min-h-screen grid place-items-center text-sm text-muted">
+        Post not found.
       </div>
     );
   }
@@ -222,77 +272,95 @@ export default function EditorPage() {
   const wordCount = html.replace(/<[^>]+>/g, " ").trim().split(/\s+/).filter(Boolean).length;
 
   return (
-    <div className="md:flex">
-      <Sidebar />
-      <main className="flex-1 px-4 py-5 sm:px-6 md:px-8 md:py-6 max-w-6xl mx-auto w-full">
-        {/* Top bar */}
-        <div className="flex items-center justify-between gap-3 mb-4">
+    <div className="min-h-screen">
+      {/* Sticky glass top bar */}
+      <header className="sticky top-0 z-30 glass rounded-none border-x-0 border-t-0">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-3 flex items-center gap-3">
           <button
-            onClick={() => router.push("/dashboard")}
-            className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-white transition"
+            onClick={() => router.push("/dashboard/content")}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-ink transition shrink-0"
           >
-            <ArrowLeft size={15} /> Pipeline
+            <ArrowLeft size={16} /> <span className="hidden sm:inline">Articles</span>
           </button>
-          <div className="flex items-center gap-2 text-xs">
-            {saveState === "saving" && (
-              <span className="text-gray-500 flex items-center gap-1">
-                <Loader2 size={12} className="animate-spin" /> Saving…
-              </span>
+
+          <input
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              markDirty();
+            }}
+            placeholder="Post title…"
+            className="flex-1 min-w-0 bg-transparent text-base sm:text-lg font-semibold tracking-tight text-ink outline-none placeholder:text-slate-400"
+          />
+
+          <div className="flex items-center gap-3 shrink-0">
+            <span className="text-xs text-muted hidden sm:flex items-center gap-1">
+              {saveState === "saving" && (
+                <>
+                  <Loader2 size={12} className="animate-spin" /> Saving…
+                </>
+              )}
+              {saveState === "saved" && (
+                <span className="text-success flex items-center gap-1">
+                  <Check size={12} /> Saved
+                </span>
+              )}
+            </span>
+            {canPublish ? (
+              <Button
+                variant="primary"
+                icon={Globe}
+                loading={publishing === "publish"}
+                disabled={publishing !== null}
+                onClick={() => handlePublish("publish")}
+              >
+                {isPublished ? "Update" : "Publish"}
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                icon={CheckCircle2}
+                loading={approving}
+                disabled={!canApprove}
+                onClick={handleApprove}
+              >
+                {canApprove ? "Approve" : "Resolve gates"}
+              </Button>
             )}
-            {saveState === "saved" && (
-              <span className="text-emerald-400 flex items-center gap-1">
-                <Check size={12} /> Saved
-              </span>
-            )}
-            <button
-              onClick={handleDelete}
-              title="Delete post"
-              className="p-1.5 rounded-md text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition"
-            >
-              <Trash2 size={14} />
-            </button>
           </div>
         </div>
+      </header>
 
-        <div className="flex flex-wrap items-center gap-2 mb-2">
-          <StatusBadge status={article.status} />
-          <span
-            className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md ${
-              isManual
-                ? "bg-purple-500/10 text-purple-300"
-                : "bg-blue-500/10 text-blue-300"
-            }`}
-          >
-            {isManual ? <PenLine size={11} /> : <Sparkles size={11} />}
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 py-5">
+        {/* Status row */}
+        <div className="flex flex-wrap items-center gap-2 mb-4 animate-fade-up">
+          <Badge tone={isPublished ? "success" : isApproved ? "brand" : "warn"}>
+            {article.status.replace(/_/g, " ")}
+          </Badge>
+          <Badge tone={isManual ? "ai" : "brand"} icon={isManual ? PenLine : Sparkles}>
             {isManual ? "Manual" : "AI-assisted"}
-          </span>
-          <span className="text-xs text-gray-500">{wordCount} words</span>
+          </Badge>
+          <span className="text-xs text-muted">{wordCount} words</span>
+          {article.needsRewrite && (
+            <Badge tone="warn" icon={AlertTriangle}>
+              needs rewrite
+            </Badge>
+          )}
         </div>
 
-        {/* Editable title */}
-        <input
-          value={title}
-          onChange={(e) => {
-            setTitle(e.target.value);
-            markDirty();
-          }}
-          placeholder="Post title…"
-          className="w-full bg-transparent text-2xl font-semibold tracking-tight outline-none placeholder:text-gray-600 mb-4"
-        />
-
         {error && (
-          <div className="mb-4 text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
+          <div className="mb-4 text-sm text-danger bg-danger-soft border border-danger/20 rounded-xl px-4 py-3 animate-fade-up">
             {error}
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
-          {/* Editor */}
-          <div>
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
+          {/* LEFT — editor */}
+          <div className="space-y-4 animate-fade-up">
             {article.humanInputMarkers.length > 0 && (
-              <div className="bg-ink-900 border border-ink-700 rounded-xl p-4 mb-4">
-                <div className="flex items-center gap-2 mb-3 text-sm font-medium">
-                  <AlertTriangle size={14} className="text-amber-400" />
+              <div className="glass p-4">
+                <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-ink">
+                  <AlertTriangle size={15} className="text-warn" />
                   Human input needed ({unresolvedCount} left)
                 </div>
                 <div className="space-y-2">
@@ -300,11 +368,12 @@ export default function EditorPage() {
                     <button
                       key={m.id}
                       onClick={() => toggleMarker(m.id, !m.resolved)}
-                      className={`w-full text-left flex items-start gap-2 px-3 py-2 rounded-lg text-xs transition ${
+                      className={cn(
+                        "w-full text-left flex items-start gap-2 px-3 py-2 rounded-lg text-xs transition border",
                         m.resolved
-                          ? "bg-green-500/5 text-green-400 border border-green-500/15"
-                          : "bg-amber-500/5 text-amber-300 border border-amber-500/15"
-                      }`}
+                          ? "bg-success-soft text-success border-success/20"
+                          : "bg-warn-soft text-warn border-warn/20"
+                      )}
                     >
                       {m.resolved ? (
                         <CheckCircle2 size={14} className="shrink-0 mt-0.5" />
@@ -333,202 +402,290 @@ export default function EditorPage() {
             />
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-4">
-            {/* Publish box */}
-            <div className="bg-ink-900 border border-ink-700 rounded-xl p-4">
-              <div className="text-sm font-medium mb-3">Publish</div>
-              {isPublished && article.wordpressUrl ? (
-                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3 text-sm text-emerald-400">
-                  Sent to WordPress.
-                  <a
-                    href={article.wordpressUrl}
-                    target="_blank"
-                    className="block underline mt-1 text-xs"
-                  >
-                    Open in WordPress →
-                  </a>
-                </div>
-              ) : null}
-
-              {!canPublish && !isManual ? (
-                <button
-                  onClick={handleApprove}
-                  disabled={!canApprove || approving}
-                  className={`w-full inline-flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition ${
-                    canApprove
-                      ? "bg-blue-600 hover:bg-blue-500"
-                      : "bg-ink-800 text-gray-500 cursor-not-allowed border border-ink-700"
-                  }`}
+          {/* RIGHT — sticky sidebar */}
+          <div className="space-y-4 lg:sticky lg:top-20">
+            {/* Publish panel */}
+            <Panel title="Publish" icon={Globe}>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs text-muted">Status</span>
+                <Badge tone={isPublished ? "success" : isApproved ? "brand" : "warn"}>
+                  {article.status.replace(/_/g, " ")}
+                </Badge>
+              </div>
+              {isPublished && article.wordpressUrl && (
+                <a
+                  href={article.wordpressUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mb-3 flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-700 underline"
                 >
-                  {approving ? <Loader2 size={14} className="animate-spin" /> : null}
-                  {canApprove ? "Approve for publishing" : "Resolve markers + 700 words"}
-                </button>
-              ) : (
+                  <ExternalLink size={12} /> Open in WordPress
+                </a>
+              )}
+              {canPublish ? (
                 <div className="space-y-2">
-                  <button
+                  <Button
+                    variant="ghost"
+                    icon={PenLine}
+                    className="w-full"
+                    loading={publishing === "draft"}
+                    disabled={publishing !== null}
                     onClick={() => handlePublish("draft")}
-                    disabled={publishing !== null}
-                    className="w-full inline-flex items-center justify-center gap-2 bg-ink-800 hover:bg-ink-700 border border-ink-600 disabled:opacity-50 rounded-lg py-2.5 text-sm font-medium"
                   >
-                    {publishing === "draft" ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <FileEdit size={14} />
-                    )}
-                    {publishing === "draft" ? "Sending…" : "Save as Draft"}
-                  </button>
-                  <button
+                    Save WP draft
+                  </Button>
+                  <Button
+                    variant="primary"
+                    icon={Globe}
+                    className="w-full"
+                    loading={publishing === "publish"}
+                    disabled={publishing !== null}
                     onClick={() => handlePublish("publish")}
-                    disabled={publishing !== null}
-                    className="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded-lg py-2.5 text-sm font-medium shadow-lg shadow-emerald-600/20"
                   >
-                    {publishing === "publish" ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <Globe size={14} />
-                    )}
-                    {publishing === "publish" ? "Publishing…" : "Publish Live"}
-                  </button>
-                  <p className="text-[11px] text-gray-500">
-                    Draft = safe review on WordPress. Live = published immediately.
+                    {isPublished ? "Update live" : "Publish live"}
+                  </Button>
+                  <p className="text-[11px] text-muted">
+                    Live publishes to your frontend now; WordPress is a best-effort mirror.
                   </p>
                 </div>
+              ) : (
+                <Button
+                  variant="primary"
+                  icon={CheckCircle2}
+                  className="w-full"
+                  loading={approving}
+                  disabled={!canApprove}
+                  onClick={handleApprove}
+                >
+                  {canApprove ? "Approve for publishing" : "Resolve markers + 700 words"}
+                </Button>
               )}
-            </div>
+            </Panel>
 
-            {/* SEO fields */}
-            <div className="bg-ink-900 border border-ink-700 rounded-xl p-4 space-y-3">
-              <div className="text-sm font-medium">SEO</div>
-              <Field
-                label="Focus keyword"
-                value={primaryKeyword}
-                onChange={(v) => {
-                  setPrimaryKeyword(v);
-                  markDirty();
-                }}
-                placeholder="banff vs whistler"
-              />
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Meta description
-                  <span className="text-gray-600 ml-1">
-                    {metaDescription.length}/160
-                  </span>
-                </label>
-                <textarea
-                  value={metaDescription}
-                  onChange={(e) => {
-                    setMetaDescription(e.target.value);
-                    markDirty();
-                  }}
-                  rows={3}
-                  placeholder="150-160 chars with a reason to click…"
-                  className="w-full bg-ink-800 border border-ink-600 rounded-lg p-2 text-xs outline-none focus:border-blue-500 resize-none"
+            {/* Cover / thumbnail panel */}
+            <Panel title="Cover / Thumbnail" icon={ImageIcon}>
+              {(thumbPreview || article.coverImageUrl) && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={thumbPreview || article.coverImageUrl}
+                  alt="Cover preview"
+                  className="w-full aspect-[1200/630] object-cover rounded-xl border border-line mb-3 bg-slate-100"
                 />
-              </div>
-              <div>
-                <label className="text-xs text-gray-400 flex items-center gap-1 mb-1">
-                  <Tag size={11} /> Tags (comma separated)
-                </label>
-                <input
-                  value={tags}
-                  onChange={(e) => {
-                    setTags(e.target.value);
-                    markDirty();
-                  }}
-                  placeholder="banff, whistler, rockies"
-                  className="w-full bg-ink-800 border border-ink-600 rounded-lg p-2 text-xs outline-none focus:border-blue-500"
-                />
-                {tags.trim() && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {tags.split(",").map((t) => t.trim()).filter(Boolean).map((t) => (
-                      <span
-                        key={t}
-                        className="text-[11px] px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-300 border border-blue-500/20"
-                      >
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* AI insight (AI posts only) */}
-            {!isManual && (
-              <TopicInsight article={article} />
-            )}
-
-            {/* SEO checklist */}
-            <div className="bg-ink-900 border border-ink-700 rounded-xl p-4">
-              <div className="text-sm font-medium mb-3">Quality checks</div>
-              <div className="space-y-2 text-xs">
-                <CheckRow label="Title set" pass={title.trim().length > 0} />
-                <CheckRow label="Title ≤ 60 chars" pass={title.length <= 60 && title.length > 0} />
-                <CheckRow
-                  label="Meta description 140-165"
-                  pass={metaDescription.length >= 140 && metaDescription.length <= 165}
-                />
-                <CheckRow label="Focus keyword set" pass={primaryKeyword.trim().length > 0} />
-                <CheckRow label="Has content (300+ words)" pass={wordCount >= 300} />
-                {!isManual && (
-                  <CheckRow label="No unresolved markers" pass={unresolvedCount === 0} />
-                )}
-              </div>
-            </div>
-
-            {/* Thumbnail prompt (AI only) */}
-            {!isManual && article.featuredImagePrompt && (
-              <div className="bg-ink-900 border border-ink-700 rounded-xl p-4">
-                <div className="flex items-center gap-2 text-sm font-medium mb-2">
-                  <ImageIcon size={14} /> Thumbnail prompt
+              )}
+              {article.thumbnailStatus === "approved" && (
+                <div className="mb-3">
+                  <Badge tone="success" icon={CheckCircle2}>
+                    Approved as cover
+                  </Badge>
                 </div>
-                <p className="text-xs text-gray-400 leading-relaxed font-mono">
-                  {article.featuredImagePrompt}
+              )}
+              <div className="space-y-2">
+                <Button
+                  variant="ai"
+                  icon={Sparkles}
+                  className="w-full"
+                  loading={genThumb}
+                  onClick={handleGenerateThumbnail}
+                >
+                  Generate thumbnail
+                </Button>
+                {thumbPreview && article.thumbnailStatus !== "approved" && (
+                  <Button
+                    variant="soft"
+                    icon={Check}
+                    className="w-full"
+                    loading={approveThumb}
+                    onClick={handleApproveThumbnail}
+                  >
+                    Approve &amp; use as cover
+                  </Button>
+                )}
+              </div>
+            </Panel>
+
+            {/* Web story panel */}
+            <Panel title="Web story" icon={Clapperboard}>
+              <p className="text-xs text-muted mb-3">
+                Turn this article into a tappable AMP-style web story.
+              </p>
+              <Button
+                variant="ai"
+                icon={Clapperboard}
+                className="w-full"
+                loading={genStory}
+                onClick={handleGenerateStory}
+              >
+                Generate web story
+              </Button>
+              {storyDone && (
+                <button
+                  onClick={() => router.push("/dashboard/stories")}
+                  className="mt-2 w-full flex items-center justify-center gap-1.5 text-xs text-brand-600 hover:text-brand-700 underline"
+                >
+                  <ExternalLink size={12} /> View in Web Stories
+                </button>
+              )}
+            </Panel>
+
+            {/* SEO panel */}
+            <Panel title="SEO" icon={Search}>
+              <div className="space-y-3">
+                <LabeledInput
+                  label="Meta title"
+                  counter={`${metaTitle.length}/60`}
+                  value={metaTitle}
+                  onChange={(v) => {
+                    setMetaTitle(v);
+                    markDirty();
+                  }}
+                  placeholder="Search-result headline…"
+                />
+                <div>
+                  <label className="flex items-center justify-between text-xs text-muted mb-1">
+                    <span>Meta description</span>
+                    <span>{metaDescription.length}/160</span>
+                  </label>
+                  <textarea
+                    value={metaDescription}
+                    onChange={(e) => {
+                      setMetaDescription(e.target.value);
+                      markDirty();
+                    }}
+                    rows={3}
+                    placeholder="150–160 chars with a reason to click…"
+                    className="w-full rounded-lg border border-line bg-white/80 p-2 text-xs text-ink outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-100 resize-none transition"
+                  />
+                </div>
+                <LabeledInput
+                  label="Slug"
+                  value={slug}
+                  onChange={(v) => {
+                    setSlug(v);
+                    markDirty();
+                  }}
+                  placeholder="banff-vs-whistler"
+                />
+                <LabeledInput
+                  label="Focus keyword"
+                  value={primaryKeyword}
+                  onChange={(v) => {
+                    setPrimaryKeyword(v);
+                    markDirty();
+                  }}
+                  placeholder="banff vs whistler"
+                />
+                <div>
+                  <label className="flex items-center gap-1 text-xs text-muted mb-1">
+                    <Tag size={11} /> Tags (comma separated)
+                  </label>
+                  <input
+                    value={tags}
+                    onChange={(e) => {
+                      setTags(e.target.value);
+                      markDirty();
+                    }}
+                    placeholder="banff, whistler, rockies"
+                    className="w-full rounded-lg border border-line bg-white/80 p-2 text-xs text-ink outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-100 transition"
+                  />
+                  {tags.trim() && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {tags
+                        .split(",")
+                        .map((t) => t.trim())
+                        .filter(Boolean)
+                        .map((t) => (
+                          <Badge key={t} tone="brand">
+                            {t}
+                          </Badge>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Panel>
+
+            {/* Category panel */}
+            <Panel title="Category" icon={FolderOpen}>
+              <div className="space-y-3">
+                <LabeledInput
+                  label="Category name"
+                  value={categoryName}
+                  onChange={(v) => {
+                    setCategoryName(v);
+                    markDirty();
+                  }}
+                  placeholder="Destinations"
+                />
+                <LabeledInput
+                  label="Category slug"
+                  value={categorySlug}
+                  onChange={(v) => {
+                    setCategorySlug(v);
+                    markDirty();
+                  }}
+                  placeholder="destinations"
+                />
+                <p className="text-[11px] text-muted">
+                  Category &amp; slug editing needs the metadata API extended (see report).
                 </p>
               </div>
-            )}
+            </Panel>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
 
-function Field({
+/* ------------------------------- helpers ------------------------------- */
+
+function Panel({
+  title,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  icon: LucideIcon;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="glass p-4 animate-fade-up">
+      <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-ink">
+        <span className="grid place-items-center h-7 w-7 rounded-lg bg-brand-50 text-brand-600">
+          <Icon size={14} />
+        </span>
+        {title}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function LabeledInput({
   label,
+  counter,
   value,
   onChange,
   placeholder,
 }: {
   label: string;
+  counter?: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
 }) {
   return (
     <div>
-      <label className="text-xs text-gray-400 block mb-1">{label}</label>
+      <label className="flex items-center justify-between text-xs text-muted mb-1">
+        <span>{label}</span>
+        {counter && <span>{counter}</span>}
+      </label>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full bg-ink-800 border border-ink-600 rounded-lg p-2 text-xs outline-none focus:border-blue-500"
+        className="w-full rounded-lg border border-line bg-white/80 p-2 text-xs text-ink outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-100 transition"
       />
-    </div>
-  );
-}
-
-function CheckRow({ label, pass }: { label: string; pass: boolean }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-gray-400">{label}</span>
-      {pass ? (
-        <CheckCircle2 size={14} className="text-green-400" />
-      ) : (
-        <Circle size={14} className="text-gray-600" />
-      )}
     </div>
   );
 }

@@ -1,7 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Sidebar from "@/components/Sidebar";
+import {
+  Card,
+  Button,
+  Badge,
+  EmptyState,
+  Skeleton,
+  cn,
+} from "@/components/ui";
 import {
   MessageSquare,
   Mail,
@@ -11,7 +18,6 @@ import {
   Trash2,
   CornerDownRight,
   Send,
-  Loader2,
   Reply,
   Archive,
   Inbox as InboxIcon,
@@ -103,74 +109,58 @@ export default function InboxPage() {
   const newMessages = messages.filter((m) => m.status === "new").length;
 
   return (
-    <div className="flex min-h-screen bg-ink-950">
-      <Sidebar />
-      <main className="flex-1 min-w-0">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-          {/* Header */}
-          <div className="flex items-start justify-between gap-4 mb-6">
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight flex items-center gap-2">
-                <InboxIcon size={20} className="text-blue-400" />
-                Inbox
-              </h1>
-              <p className="text-sm text-gray-400 mt-1">
-                Moderate visitor comments and read contact-form messages.
-              </p>
-            </div>
-            <button
-              onClick={load}
-              disabled={loading}
-              className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-white border border-ink-700 hover:border-ink-600 rounded-lg px-3 py-2 transition disabled:opacity-50"
-            >
-              <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
-              Refresh
-            </button>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex items-center gap-1 p-1 bg-ink-900 border border-ink-700 rounded-xl w-fit mb-6">
-            <TabButton
-              active={tab === "comments"}
-              onClick={() => setTab("comments")}
-              icon={<MessageSquare size={14} />}
-              label="Comments"
-              badge={pendingComments}
-            />
-            <TabButton
-              active={tab === "messages"}
-              onClick={() => setTab("messages")}
-              icon={<Mail size={14} />}
-              label="Messages"
-              badge={newMessages}
-            />
-          </div>
-
-          {error && (
-            <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-              {error}
-            </div>
-          )}
-
-          {loading ? (
-            <div className="flex items-center justify-center py-24 text-gray-500">
-              <Loader2 className="animate-spin" size={22} />
-            </div>
-          ) : tab === "comments" ? (
-            <CommentsTab
-              comments={comments}
-              onChanged={load}
-              setComments={setComments}
-            />
-          ) : (
-            <MessagesTab
-              messages={messages}
-              onChanged={load}
-              setMessages={setMessages}
-            />
-          )}
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 animate-fade-up">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-ink flex items-center gap-2">
+            <InboxIcon size={22} className="text-brand-600" />
+            Inbox
+          </h1>
+          <p className="text-sm text-muted mt-1">
+            Moderate visitor comments and read contact-form messages.
+          </p>
         </div>
-      </main>
+        <Button variant="ghost" icon={RefreshCw} onClick={load} disabled={loading}>
+          Refresh
+        </Button>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-1 p-1 glass w-fit">
+        <TabButton
+          active={tab === "comments"}
+          onClick={() => setTab("comments")}
+          icon={<MessageSquare size={14} />}
+          label="Comments"
+          badge={pendingComments}
+        />
+        <TabButton
+          active={tab === "messages"}
+          onClick={() => setTab("messages")}
+          icon={<Mail size={14} />}
+          label="Messages"
+          badge={newMessages}
+        />
+      </div>
+
+      {error && (
+        <div className="rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
+      ) : tab === "comments" ? (
+        <CommentsTab comments={comments} onChanged={load} setComments={setComments} />
+      ) : (
+        <MessagesTab messages={messages} onChanged={load} setMessages={setMessages} />
+      )}
     </div>
   );
 }
@@ -191,14 +181,15 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
-        active ? "bg-ink-800 text-white" : "text-gray-400 hover:text-white"
-      }`}
+      className={cn(
+        "inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition",
+        active ? "bg-white shadow-sm text-ink" : "text-muted hover:text-ink"
+      )}
     >
       {icon}
       {label}
       {badge > 0 && (
-        <span className="ml-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-blue-500 text-white text-[10px] font-bold">
+        <span className="ml-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-brand-500 text-white text-[10px] font-bold">
           {badge}
         </span>
       )}
@@ -208,7 +199,7 @@ function TabButton({
 
 // ---- Comments tab ----------------------------------------------------------
 
-type CommentFilter = "all" | "pending" | "hidden";
+type CommentFilter = "all" | "pending";
 
 function CommentsTab({
   comments,
@@ -241,14 +232,12 @@ function CommentsTab({
     return { roots, repliesByParent };
   }, [comments]);
 
-  const visibleRoots = roots.filter((c) => {
-    if (filter === "pending") return !c.approved;
-    if (filter === "hidden") return !c.approved;
-    return true;
-  });
+  const visibleRoots = roots.filter((c) => (filter === "pending" ? !c.approved : true));
 
   if (roots.length === 0) {
-    return <EmptyState icon={<MessageSquare size={26} />} text="No comments yet." />;
+    return (
+      <EmptyState icon={MessageSquare} title="No comments yet" hint="Visitor comments will show up here for moderation." />
+    );
   }
 
   return (
@@ -346,24 +335,18 @@ function CommentCard({
   }
 
   return (
-    <div className="rounded-xl border border-ink-700 bg-ink-900 p-4">
+    <Card className={cn(!comment.approved && "border-warn-soft")}>
       <div className="flex items-start gap-3">
         <Avatar name={comment.name} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium text-sm">{comment.name}</span>
+            <span className="font-medium text-sm text-ink">{comment.name}</span>
             <PostChip slug={comment.post_slug} />
-            <span className="text-xs text-gray-500">{timeAgo(comment.created_at)}</span>
-            {!comment.approved && (
-              <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">
-                Hidden
-              </span>
-            )}
-            {comment.likes > 0 && (
-              <span className="text-xs text-gray-500">♥ {comment.likes}</span>
-            )}
+            <span className="text-xs text-muted">{timeAgo(comment.created_at)}</span>
+            {!comment.approved && <Badge tone="warn">Hidden</Badge>}
+            {comment.likes > 0 && <span className="text-xs text-muted">♥ {comment.likes}</span>}
           </div>
-          <p className="mt-1.5 text-sm text-gray-300 leading-relaxed whitespace-pre-wrap break-words">
+          <p className="mt-1.5 text-sm text-slate-600 leading-relaxed whitespace-pre-wrap break-words">
             {comment.body}
           </p>
 
@@ -400,30 +383,22 @@ function CommentCard({
                 onChange={(e) => setReplyText(e.target.value)}
                 rows={3}
                 placeholder="Write a public reply as the TripTravelingGuide team…"
-                className="w-full rounded-lg bg-ink-950 border border-ink-700 focus:border-blue-500 outline-none px-3 py-2 text-sm text-gray-200 resize-y"
+                className="w-full rounded-lg bg-white border border-line focus:border-brand-400 outline-none px-3 py-2 text-sm text-ink resize-y"
               />
               <div className="mt-2 flex items-center gap-2">
-                <button
-                  onClick={submitReply}
-                  disabled={posting || !replyText.trim()}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-medium px-3 py-2 transition"
-                >
-                  {posting ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                <Button variant="primary" icon={Send} loading={posting} disabled={!replyText.trim()} onClick={submitReply}>
                   Post reply
-                </button>
-                <button
-                  onClick={() => setReplyOpen(false)}
-                  className="text-xs text-gray-400 hover:text-white px-2 py-2"
-                >
+                </Button>
+                <Button variant="ghost" onClick={() => setReplyOpen(false)}>
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           )}
 
           {/* Replies */}
           {replies.length > 0 && (
-            <div className="mt-3 space-y-2.5 border-l border-ink-700 pl-4">
+            <div className="mt-3 space-y-2.5 border-l border-line pl-4">
               {replies.map((r) => (
                 <ReplyRow key={r.id} reply={r} onChanged={onChanged} />
               ))}
@@ -431,7 +406,7 @@ function CommentCard({
           )}
         </div>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -450,25 +425,21 @@ function ReplyRow({ reply, onChanged }: { reply: CommentRow; onChanged: () => vo
   }
   return (
     <div className="flex items-start gap-2">
-      <CornerDownRight size={14} className="mt-1 text-gray-600 shrink-0" />
+      <CornerDownRight size={14} className="mt-1 text-slate-300 shrink-0" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-gray-200">{reply.name}</span>
-          {reply.is_admin_reply && (
-            <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400">
-              Team
-            </span>
-          )}
-          <span className="text-[11px] text-gray-500">{timeAgo(reply.created_at)}</span>
+          <span className="text-xs font-medium text-ink">{reply.name}</span>
+          {reply.is_admin_reply && <Badge tone="brand">Team</Badge>}
+          <span className="text-[11px] text-muted">{timeAgo(reply.created_at)}</span>
         </div>
-        <p className="text-sm text-gray-400 leading-relaxed whitespace-pre-wrap break-words">
+        <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap break-words">
           {reply.body}
         </p>
       </div>
       <button
         onClick={remove}
         disabled={busy}
-        className="text-gray-600 hover:text-red-400 p-1 transition"
+        className="text-slate-300 hover:text-danger p-1 transition"
         aria-label="Delete reply"
       >
         <Trash2 size={13} />
@@ -495,7 +466,9 @@ function MessagesTab({
   const visible = messages.filter((m) => (filter === "all" ? true : m.status === filter));
 
   if (messages.length === 0) {
-    return <EmptyState icon={<Mail size={26} />} text="No contact messages yet." />;
+    return (
+      <EmptyState icon={Mail} title="No contact messages yet" hint="Submissions from the contact form will land here." />
+    );
   }
 
   return (
@@ -519,11 +492,11 @@ function MessagesTab({
   );
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  new: "bg-blue-500/15 text-blue-400",
-  read: "bg-gray-500/15 text-gray-400",
-  replied: "bg-green-500/15 text-green-400",
-  archived: "bg-ink-700 text-gray-500",
+const STATUS_TONE: Record<string, "brand" | "neutral" | "success" | "warn"> = {
+  new: "brand",
+  read: "neutral",
+  replied: "success",
+  archived: "neutral",
 };
 
 function MessageCard({
@@ -571,28 +544,19 @@ function MessageCard({
   )}&body=${encodeURIComponent(`\n\n———\nOn your message:\n"${message.message}"`)}`;
 
   return (
-    <div className="rounded-xl border border-ink-700 bg-ink-900 p-4">
+    <Card>
       <div className="flex items-start gap-3">
         <Avatar name={message.name} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium text-sm">{message.name}</span>
-            <a
-              href={`mailto:${message.email}`}
-              className="text-xs text-blue-400 hover:text-blue-300 truncate"
-            >
+            <span className="font-medium text-sm text-ink">{message.name}</span>
+            <a href={`mailto:${message.email}`} className="text-xs text-brand-600 hover:text-brand-700 truncate">
               {message.email}
             </a>
-            <span className="text-xs text-gray-500">{timeAgo(message.created_at)}</span>
-            <span
-              className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded ${
-                STATUS_STYLES[message.status] ?? STATUS_STYLES.read
-              }`}
-            >
-              {message.status}
-            </span>
+            <span className="text-xs text-muted">{timeAgo(message.created_at)}</span>
+            <Badge tone={STATUS_TONE[message.status] ?? "neutral"}>{message.status}</Badge>
           </div>
-          <p className="mt-2 text-sm text-gray-300 leading-relaxed whitespace-pre-wrap break-words">
+          <p className="mt-2 text-sm text-slate-600 leading-relaxed whitespace-pre-wrap break-words">
             {message.message}
           </p>
 
@@ -600,41 +564,23 @@ function MessageCard({
             <a
               href={mailto}
               onClick={() => setStatus("replied")}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium px-3 py-1.5 transition"
+              className="btn-primary text-xs px-3 py-1.5"
             >
               <Reply size={13} />
               Reply by email
               <ExternalLink size={11} className="opacity-70" />
             </a>
             {message.status !== "read" && message.status !== "replied" && (
-              <ActionBtn
-                onClick={() => setStatus("read")}
-                disabled={busy}
-                tone="muted"
-                icon={<Eye size={13} />}
-                label="Mark read"
-              />
+              <ActionBtn onClick={() => setStatus("read")} disabled={busy} tone="muted" icon={<Eye size={13} />} label="Mark read" />
             )}
             {message.status !== "archived" && (
-              <ActionBtn
-                onClick={() => setStatus("archived")}
-                disabled={busy}
-                tone="muted"
-                icon={<Archive size={13} />}
-                label="Archive"
-              />
+              <ActionBtn onClick={() => setStatus("archived")} disabled={busy} tone="muted" icon={<Archive size={13} />} label="Archive" />
             )}
-            <ActionBtn
-              onClick={remove}
-              disabled={busy}
-              tone="red"
-              icon={<Trash2 size={13} />}
-              label="Delete"
-            />
+            <ActionBtn onClick={remove} disabled={busy} tone="red" icon={<Trash2 size={13} />} label="Delete" />
           </div>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -642,7 +588,7 @@ function MessageCard({
 
 function Avatar({ name }: { name: string }) {
   return (
-    <div className="shrink-0 grid place-items-center h-9 w-9 rounded-full bg-gradient-to-br from-blue-500/30 to-blue-500/5 ring-1 ring-blue-500/20 text-xs font-semibold text-blue-300">
+    <div className="shrink-0 grid place-items-center h-9 w-9 rounded-full bg-brand-50 ring-1 ring-brand-100 text-xs font-semibold text-brand-600">
       {initials(name) || "?"}
     </div>
   );
@@ -650,7 +596,7 @@ function Avatar({ name }: { name: string }) {
 
 function PostChip({ slug }: { slug: string }) {
   return (
-    <span className="inline-flex items-center gap-1 text-[11px] text-gray-400 bg-ink-800 border border-ink-700 rounded px-1.5 py-0.5">
+    <span className="inline-flex items-center gap-1 text-[11px] text-muted bg-slate-50 border border-line rounded px-1.5 py-0.5">
       <MessageSquare size={10} className="opacity-60" />
       {slug}
     </span>
@@ -671,16 +617,19 @@ function ActionBtn({
   label: string;
 }) {
   const tones: Record<string, string> = {
-    green: "border-green-500/30 text-green-400 hover:bg-green-500/10",
-    blue: "border-blue-500/30 text-blue-400 hover:bg-blue-500/10",
-    red: "border-red-500/30 text-red-400 hover:bg-red-500/10",
-    muted: "border-ink-700 text-gray-400 hover:text-white hover:border-ink-600",
+    green: "border-success/30 text-success hover:bg-success-soft",
+    blue: "border-brand-300 text-brand-600 hover:bg-brand-50",
+    red: "border-danger/30 text-danger hover:bg-danger-soft",
+    muted: "border-line text-muted hover:text-ink hover:border-slate-300",
   };
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center gap-1.5 rounded-lg border text-xs font-medium px-2.5 py-1.5 transition disabled:opacity-50 ${tones[tone]}`}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-lg border text-xs font-medium px-2.5 py-1.5 transition disabled:opacity-50",
+        tones[tone]
+      )}
     >
       {icon}
       {label}
@@ -703,25 +652,17 @@ function FilterRow({
         <button
           key={o.key}
           onClick={() => onChange(o.key)}
-          className={`inline-flex items-center gap-1.5 rounded-full text-xs px-3 py-1.5 border transition ${
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-full text-xs px-3 py-1.5 border transition",
             value === o.key
-              ? "border-blue-500/40 bg-blue-500/10 text-blue-300"
-              : "border-ink-700 text-gray-400 hover:text-white"
-          }`}
+              ? "border-brand-300 bg-brand-50 text-brand-700"
+              : "border-line text-muted hover:text-ink"
+          )}
         >
           {o.label}
           <span className="opacity-60">{o.count}</span>
         </button>
       ))}
-    </div>
-  );
-}
-
-function EmptyState({ icon, text }: { icon: React.ReactNode; text: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-24 text-gray-500">
-      <div className="text-gray-600 mb-3">{icon}</div>
-      <p className="text-sm">{text}</p>
     </div>
   );
 }

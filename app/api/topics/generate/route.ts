@@ -8,9 +8,18 @@ import { slugify } from "@/lib/markdown";
 
 // POST /api/topics/generate
 // Module 1 — runs topic discovery and creates a new Article row in "discovered" status.
-export async function POST() {
+export async function POST(request: Request) {
   try {
-    const topic = await discoverTopic();
+    // Optional { keyword } from AI Studio steers discovery toward the user's topic.
+    let seed: string | undefined;
+    try {
+      const body = await request.json();
+      if (typeof body?.keyword === "string") seed = body.keyword;
+    } catch {
+      /* no body — model researches a trending topic on its own */
+    }
+
+    const topic = await discoverTopic(seed);
 
     const slug = slugify(topic.title);
 

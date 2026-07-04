@@ -95,6 +95,30 @@ export async function PATCH(
     if (typeof body.primaryKeyword === "string")
       data.primaryKeyword = body.primaryKeyword;
     if (typeof body.tags === "string") data.tags = body.tags;
+    if (typeof body.categoryName === "string") data.categoryName = body.categoryName;
+    if (typeof body.categorySlug === "string") data.categorySlug = body.categorySlug;
+    // Slug is @unique — normalize and guard against collisions so a bad edit
+    // returns a clear 409 instead of an opaque Prisma error.
+    if (typeof body.slug === "string" && body.slug.trim()) {
+      const slug = body.slug
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+      if (slug) {
+        const clash = await prisma.article.findFirst({
+          where: { slug, NOT: { id: params.id } },
+          select: { id: true },
+        });
+        if (clash) {
+          return NextResponse.json(
+            { error: `Slug "${slug}" is already used by another post.` },
+            { status: 409 }
+          );
+        }
+        data.slug = slug;
+      }
+    }
     if (
       typeof body.comparisonType === "string" &&
       ["destination", "transport", "stay"].includes(body.comparisonType)
