@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
+// DB-backed route: never prerender at build time (would try to hit the DB).
+export const dynamic = "force-dynamic";
+
 // GET /api/activity — day-by-day history of pipeline events.
 // Buckets created / approved / published events per calendar day so the
 // dashboard can show "today vs yesterday vs all history".

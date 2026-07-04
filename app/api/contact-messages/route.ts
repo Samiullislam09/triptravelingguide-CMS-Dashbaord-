@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { listContactMessages } from "@/lib/inbox";
 
+// DB-backed route: never prerender at build time (would try to hit the DB).
+export const dynamic = "force-dynamic";
+
 // GET /api/contact-messages — all contact-form submissions, newest first.
 export async function GET() {
   try {

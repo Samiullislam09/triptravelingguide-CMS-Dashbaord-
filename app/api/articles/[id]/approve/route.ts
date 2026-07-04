@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
+// DB-backed route: never prerender at build time (would try to hit the DB).
+export const dynamic = "force-dynamic";
+
 // POST /api/articles/[id]/approve
 // Enforces PDF Section 9.2's "Hard Gate Rules" server-side — these CANNOT
 // be bypassed from the UI, because the check lives here, not in a button's

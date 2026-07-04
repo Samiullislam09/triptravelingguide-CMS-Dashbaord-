@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+
+// DB-backed route: never prerender at build time (would try to hit the DB).
+export const dynamic = "force-dynamic";
 import { markdownToHtml } from "@/lib/markdown";
 
 // GET /api/articles/[id] — fetch one article with its markers and links
