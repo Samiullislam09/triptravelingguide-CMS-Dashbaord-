@@ -6,10 +6,18 @@ generator client {
 }
 
 datasource db {
-  // Postgres (Neon) — works both locally and on Vercel serverless.
-  // DATABASE_URL  = pooled connection string (used at runtime).
-  // DIRECT_URL    = direct (non-pooled) string (used by prisma migrate/db push).
-  // Both come from the Neon dashboard; see POSTGRES_SETUP.md.
+  // Postgres (Supabase, project ref etuqhwpyfdpkgykexhnb).
+  //
+  // IMPORTANT for Vercel/serverless: the DIRECT connection host
+  // (db.<ref>.supabase.co:5432) is IPv6-ONLY, and Vercel functions have no IPv6
+  // egress — using it in production makes every query fail with a 500. On
+  // serverless you MUST use the IPv4 connection pooler (Supavisor):
+  //   DATABASE_URL = Transaction pooler, port 6543 (runtime):
+  //     postgresql://postgres.<ref>:[PW]@aws-0-<region>.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
+  //   DIRECT_URL   = Session pooler, port 5432 (migrations / prisma db push):
+  //     postgresql://postgres.<ref>:[PW]@aws-0-<region>.pooler.supabase.com:5432/postgres
+  // Copy both from Supabase → Project Settings → Database → "Connection pooling".
+  // The direct db.<ref>.supabase.co URL is fine for LOCAL dev only.
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")

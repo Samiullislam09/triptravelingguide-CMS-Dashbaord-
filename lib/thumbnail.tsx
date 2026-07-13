@@ -36,7 +36,7 @@ export async function renderThumbnail({
           flexDirection: "column",
           justifyContent: "space-between",
           padding: "64px 72px",
-          backgroundImage: "linear-gradient(135deg, #3b6cf6 0%, #7c3aed 100%)",
+          backgroundImage: "linear-gradient(135deg, #f97316 0%, #ef4444 100%)",
           fontFamily: "sans-serif",
         }}
       >
