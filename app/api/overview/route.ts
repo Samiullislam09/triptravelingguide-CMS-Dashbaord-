@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { apiError } from "@/lib/apiError";
 
 // DB-backed route: never prerender at build time (would try to hit the DB).
 export const dynamic = "force-dynamic";
@@ -12,6 +13,7 @@ function dayKey(d: Date): string {
 // content pipeline counts, 14-day activity series, GSC search totals (if synced),
 // and the "Today's pick" keyword opportunity (high impressions, page 1-2 position).
 export async function GET() {
+  try {
   const [articles, storyCount, gscTotals, opportunities] = await Promise.all([
     prisma.article.findMany({ orderBy: { createdAt: "desc" } }),
     prisma.webStory.count(),
@@ -116,4 +118,7 @@ export async function GET() {
       updatedAt: a.createdAt,
     })),
   });
+  } catch (error) {
+    return apiError(error);
+  }
 }

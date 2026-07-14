@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { apiError } from "@/lib/apiError";
 
 // DB-backed route: never prerender at build time (would try to hit the DB).
 export const dynamic = "force-dynamic";
 
 // GET /api/dashboard-stats — aggregate counts + scoring data for the analytics page
 export async function GET() {
+  try {
   const articles = await prisma.article.findMany({
     orderBy: { createdAt: "desc" },
   });

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { apiError } from "@/lib/apiError";
 
 // DB-backed route: never prerender at build time (would try to hit the DB).
 export const dynamic = "force-dynamic";
@@ -12,10 +13,7 @@ export async function GET() {
       include: { humanInputMarkers: true },
     });
     return NextResponse.json({ articles });
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message || "Failed to fetch articles" },
-      { status: 500 }
-    );
+  } catch (error) {
+    return apiError(error);
   }
 }

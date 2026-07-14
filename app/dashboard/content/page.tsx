@@ -76,6 +76,7 @@ function ContentPageInner() {
   const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
+  const [error, setError] = useState("");
 
   // Preselect the filter from ?filter=needsRewrite (e.g. from the Overview page).
   useEffect(() => {
@@ -84,21 +85,49 @@ function ContentPageInner() {
   }, [searchParams]);
 
   useEffect(() => {
-    fetch("/api/articles")
-      .then((r) => r.json())
-      .then((d) => setArticles(Array.isArray(d.articles) ? d.articles : []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/articles");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || `Failed to load posts (${res.status}).`);
+        }
+        if (!cancelled) {
+          setArticles(Array.isArray(data.articles) ? data.articles : []);
+          setError("");
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(
+            e instanceof Error ? e.message : "Could not load posts. Please try again.",
+          );
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function handleWritePost() {
     setCreating(true);
+    setError("");
     try {
       const res = await fetch("/api/articles/create-manual", { method: "POST" });
-      const data = await res.json();
-      if (res.ok && data.article?.id) {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || `Couldn't create the post (${res.status}).`);
+      }
+      if (data.article?.id) {
         router.push(`/review/${data.article.id}`);
       }
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Couldn't create the post. Please try again.",
+      );
     } finally {
       setCreating(false);
     }
@@ -141,6 +170,14 @@ function ContentPageInner() {
           Write post
         </Button>
       </div>
+
+      {/* Error banner — surfaces DB/connection failures instead of a blank list */}
+      {error && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-danger/20 bg-danger-soft px-4 py-3 text-sm text-danger animate-fade-in">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* Controls */}
       <Card className="p-4" delay={40}>

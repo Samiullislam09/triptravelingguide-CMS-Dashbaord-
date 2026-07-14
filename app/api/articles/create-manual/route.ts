@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { apiError } from "@/lib/apiError";
 
 // DB-backed route: never prerender at build time (would try to hit the DB).
 export const dynamic = "force-dynamic";
@@ -19,20 +20,24 @@ export async function POST(request: NextRequest) {
     // use defaults
   }
 
-  const base = slugify(title) || "post";
-  const article = await prisma.article.create({
-    data: {
-      title,
-      slug: `${base}-${Date.now().toString(36)}`,
-      status: "pending_review", // editable draft in the CMS
-      source: "manual",
-      comparisonType,
-      primaryKeyword: "",
-      metaTitle: title,
-      contentHtml: "",
-      contentMarkdown: "",
-    },
-  });
+  try {
+    const base = slugify(title) || "post";
+    const article = await prisma.article.create({
+      data: {
+        title,
+        slug: `${base}-${Date.now().toString(36)}`,
+        status: "pending_review", // editable draft in the CMS
+        source: "manual",
+        comparisonType,
+        primaryKeyword: "",
+        metaTitle: title,
+        contentHtml: "",
+        contentMarkdown: "",
+      },
+    });
 
-  return NextResponse.json({ article });
+    return NextResponse.json({ article });
+  } catch (error) {
+    return apiError(error);
+  }
 }
