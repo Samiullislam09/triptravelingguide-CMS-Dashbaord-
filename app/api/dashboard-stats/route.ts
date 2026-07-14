@@ -77,4 +77,7 @@ export async function GET() {
     topTopics,
     hasRealAnalyticsData: snapshotCount > 0,
   });
+  } catch (error) {
+    return apiError(error);
+  }
 }

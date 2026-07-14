@@ -150,6 +150,70 @@ body {
   bottom: 0;
 }
 .tiptap hr { border: none; border-top: 1px solid #e6e9f0; margin: 1.25rem 0; }
+.tiptap.ProseMirror-focused img.ProseMirror-selectednode,
+.tiptap img.ProseMirror-selectednode {
+  outline: 3px solid #3b6cf6;
+  outline-offset: 2px;
+}
+
+/* ---- Shared marks/blocks (editor + rendered post) ---- */
+.article-content mark, .tiptap mark {
+  background: #fef08a;
+  color: inherit;
+  padding: 0.05em 0.15em;
+  border-radius: 3px;
+  box-decoration-break: clone;
+}
+.article-content code, .tiptap code {
+  background: #eef1f7;
+  color: #b4295a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.86em;
+  padding: 0.12em 0.4em;
+  border-radius: 5px;
+}
+.article-content pre, .tiptap pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 12px;
+  padding: 0.9rem 1.1rem;
+  margin: 1rem 0;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+.article-content pre code, .tiptap pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font-size: inherit;
+}
+/* Task list (checkboxes) */
+.article-content ul[data-type="taskList"], .tiptap ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0.25rem;
+  margin: 0.75rem 0;
+}
+.article-content ul[data-type="taskList"] li, .tiptap ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin: 0.35rem 0;
+}
+.article-content ul[data-type="taskList"] li > label,
+.tiptap ul[data-type="taskList"] li > label {
+  margin-top: 0.15rem;
+  user-select: none;
+}
+.article-content ul[data-type="taskList"] li > div,
+.tiptap ul[data-type="taskList"] li > div { flex: 1 1 auto; }
+.tiptap ul[data-type="taskList"] input[type="checkbox"],
+.article-content ul[data-type="taskList"] input[type="checkbox"] {
+  accent-color: #3b6cf6;
+  width: 1.05em;
+  height: 1.05em;
+  cursor: pointer;
+}
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 11px; height: 11px; }

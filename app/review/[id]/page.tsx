@@ -128,11 +128,25 @@ export default function EditorPage() {
         metaDescription,
         primaryKeyword,
         tags,
+        slug,
+        categoryName,
+        categorySlug,
       }),
     });
     dirtyRef.current = false;
     setSaveState("saved");
-  }, [id, html, title, metaTitle, metaDescription, primaryKeyword, tags]);
+  }, [
+    id,
+    html,
+    title,
+    metaTitle,
+    metaDescription,
+    primaryKeyword,
+    tags,
+    slug,
+    categoryName,
+    categorySlug,
+  ]);
 
   // Debounced autosave whenever an editable field changes.
   function markDirty() {
@@ -626,7 +640,7 @@ export default function EditorPage() {
                   placeholder="destinations"
                 />
                 <p className="text-[11px] text-muted">
-                  Category &amp; slug editing needs the metadata API extended (see report).
+                  Saved automatically. Slug must be unique across posts.
                 </p>
               </div>
             </Panel>
