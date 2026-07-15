@@ -19,6 +19,8 @@ import {
   Sparkles,
   ImageIcon,
   ArrowRight,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 
 interface Marker {
@@ -77,6 +79,7 @@ function ContentPageInner() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [error, setError] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Preselect the filter from ?filter=needsRewrite (e.g. from the Overview page).
   useEffect(() => {
@@ -130,6 +133,28 @@ function ContentPageInner() {
       );
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function handleDelete(a: Article, e: React.MouseEvent) {
+    e.stopPropagation();
+    const ok = window.confirm(
+      `Delete "${a.title || "this post"}" permanently?\n\nIf it's live, it's removed from your site too. This cannot be undone.`
+    );
+    if (!ok) return;
+    setDeletingId(a.id);
+    setError("");
+    try {
+      const res = await fetch(`/api/articles/${a.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Couldn't delete the post (${res.status}).`);
+      }
+      setArticles((prev) => prev.filter((x) => x.id !== a.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't delete the post.");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -256,43 +281,61 @@ function ContentPageInner() {
               const thumb = a.coverImageUrl || a.thumbnailUrl;
               const category = a.categoryName || a.comparisonType;
               return (
-                <button
+                <div
                   key={a.id}
-                  onClick={() => router.push(`/review/${a.id}`)}
-                  className="w-full text-left flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-white/70 transition group"
+                  className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-white/70 transition group"
                 >
-                  {/* Cover thumb */}
-                  {thumb ? (
-                    <span
-                      className="h-12 w-16 rounded-lg bg-cover bg-center shrink-0 bg-slate-100 border border-line"
-                      style={{ backgroundImage: `url(${thumb})` }}
-                    />
-                  ) : (
-                    <span className="h-12 w-16 rounded-lg shrink-0 bg-slate-100 border border-line grid place-items-center text-slate-300">
-                      <ImageIcon size={16} />
+                  <button
+                    onClick={() => router.push(`/review/${a.id}`)}
+                    className="flex-1 min-w-0 text-left flex items-center gap-3"
+                  >
+                    {/* Cover thumb */}
+                    {thumb ? (
+                      <span
+                        className="h-12 w-16 rounded-lg bg-cover bg-center shrink-0 bg-slate-100 border border-line"
+                        style={{ backgroundImage: `url(${thumb})` }}
+                      />
+                    ) : (
+                      <span className="h-12 w-16 rounded-lg shrink-0 bg-slate-100 border border-line grid place-items-center text-slate-300">
+                        <ImageIcon size={16} />
+                      </span>
+                    )}
+                    {/* Text */}
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-medium text-ink truncate">
+                        {a.title || "Untitled post"}
+                      </span>
+                      <span className="flex flex-wrap items-center gap-2 mt-1">
+                        <Badge tone={statusTone(a.status)}>{a.status.replace(/_/g, " ")}</Badge>
+                        {category && <Badge tone="neutral">{category}</Badge>}
+                        <span className="text-xs text-muted">{a.wordCount} words</span>
+                        {a.needsRewrite && (
+                          <Badge tone="warn" icon={AlertTriangle}>
+                            needs rewrite
+                          </Badge>
+                        )}
+                      </span>
                     </span>
-                  )}
-                  {/* Text */}
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-sm font-medium text-ink truncate">
-                      {a.title || "Untitled post"}
-                    </span>
-                    <span className="flex flex-wrap items-center gap-2 mt-1">
-                      <Badge tone={statusTone(a.status)}>{a.status.replace(/_/g, " ")}</Badge>
-                      {category && <Badge tone="neutral">{category}</Badge>}
-                      <span className="text-xs text-muted">{a.wordCount} words</span>
-                      {a.needsRewrite && (
-                        <Badge tone="warn" icon={AlertTriangle}>
-                          needs rewrite
-                        </Badge>
-                      )}
-                    </span>
-                  </span>
+                  </button>
+                  {/* Delete */}
+                  <button
+                    onClick={(e) => handleDelete(a, e)}
+                    disabled={deletingId === a.id}
+                    title="Delete post"
+                    aria-label="Delete post"
+                    className="shrink-0 grid place-items-center h-8 w-8 rounded-lg text-slate-300 hover:text-danger hover:bg-danger-soft transition sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 disabled:opacity-50"
+                  >
+                    {deletingId === a.id ? (
+                      <Loader2 size={15} className="animate-spin" />
+                    ) : (
+                      <Trash2 size={15} />
+                    )}
+                  </button>
                   <ArrowRight
                     size={16}
-                    className="text-slate-300 group-hover:text-brand-500 group-hover:translate-x-0.5 transition shrink-0"
+                    className="text-slate-300 group-hover:text-brand-500 transition shrink-0"
                   />
-                </button>
+                </div>
               );
             })}
           </div>

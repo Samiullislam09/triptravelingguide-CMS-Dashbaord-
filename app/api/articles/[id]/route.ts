@@ -137,12 +137,36 @@ export async function PATCH(
     return NextResponse.json({ article });
   }
 
+  // Revert a published post back to a draft (approved) state — removes it from
+  // the public frontend (which only serves status = "published") while keeping
+  // all content, WordPress link and history intact so it can be re-published.
+  if (body.action === "unpublish") {
+    const article = await prisma.article.update({
+      where: { id: params.id },
+      data: { status: "approved", publishedAt: null },
+    });
+    return NextResponse.json({ article });
+  }
+
   if (body.action === "delete") {
     await prisma.article.delete({ where: { id: params.id } });
     return NextResponse.json({ ok: true });
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+  } catch (error) {
+    return apiError(error);
+  }
+}
+
+// DELETE /api/articles/[id] — permanently remove a post and its relations.
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    await prisma.article.delete({ where: { id: params.id } });
+    return NextResponse.json({ ok: true });
   } catch (error) {
     return apiError(error);
   }

@@ -21,7 +21,15 @@ import {
   ExternalLink,
   FolderOpen,
   Search,
+  Trash2,
+  Copy,
+  Undo2,
 } from "lucide-react";
+
+// The public frontend serves posts at /<slug>. Override with NEXT_PUBLIC_SITE_URL.
+const FRONTEND_URL = (
+  process.env.NEXT_PUBLIC_SITE_URL || "https://triptravelingguide.com"
+).replace(/\/+$/, "");
 
 interface Marker {
   id: string;
@@ -63,6 +71,8 @@ export default function EditorPage() {
   const [loading, setLoading] = useState(true);
   const [approving, setApproving] = useState(false);
   const [publishing, setPublishing] = useState<"draft" | "publish" | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
 
   // editable fields
@@ -209,6 +219,46 @@ export default function EditorPage() {
     }
   }
 
+  async function handleUnpublish() {
+    setError("");
+    setPublishing("draft");
+    try {
+      const res = await fetch(`/api/articles/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "unpublish" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Failed to move to draft");
+        return;
+      }
+      fetchArticle();
+    } finally {
+      setPublishing(null);
+    }
+  }
+
+  async function handleDelete() {
+    setError("");
+    const ok = window.confirm(
+      `Delete "${title || "this post"}" permanently?\n\nThis removes it from the dashboard and the live site. This cannot be undone.`
+    );
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/articles/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Failed to delete post");
+        return;
+      }
+      router.push("/dashboard/content");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   async function handleGenerateThumbnail() {
     setError("");
     setGenThumb(true);
@@ -282,6 +332,18 @@ export default function EditorPage() {
   const isApproved = article.status === "approved" || article.status === "published";
   const isPublished = article.status === "published";
   const canPublish = isManual || isApproved;
+  const liveUrl = article.slug ? `${FRONTEND_URL}/${article.slug}` : "";
+
+  async function copyLiveUrl() {
+    if (!liveUrl) return;
+    try {
+      await navigator.clipboard.writeText(liveUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard blocked — ignore */
+    }
+  }
 
   const wordCount = html.replace(/<[^>]+>/g, " ").trim().split(/\s+/).filter(Boolean).length;
 
@@ -426,15 +488,49 @@ export default function EditorPage() {
                   {article.status.replace(/_/g, " ")}
                 </Badge>
               </div>
-              {isPublished && article.wordpressUrl && (
-                <a
-                  href={article.wordpressUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mb-3 flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-700 underline"
-                >
-                  <ExternalLink size={12} /> Open in WordPress
-                </a>
+              {/* Live post URL — shown once the article is public on the frontend */}
+              {isPublished && liveUrl && (
+                <div className="mb-3 rounded-xl border border-success/20 bg-success-soft/60 p-3">
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-success mb-1.5">
+                    <Globe size={12} /> Live on your site
+                  </div>
+                  <a
+                    href={liveUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-xs text-brand-700 hover:text-brand-800 underline break-all"
+                  >
+                    {liveUrl}
+                  </a>
+                  <div className="mt-2 flex items-center gap-2">
+                    <a
+                      href={liveUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-lg bg-white/80 border border-line px-2 py-1 text-[11px] font-medium text-ink hover:bg-white transition"
+                    >
+                      <ExternalLink size={11} /> Open
+                    </a>
+                    <button
+                      type="button"
+                      onClick={copyLiveUrl}
+                      className="inline-flex items-center gap-1 rounded-lg bg-white/80 border border-line px-2 py-1 text-[11px] font-medium text-ink hover:bg-white transition"
+                    >
+                      {copied ? <Check size={11} className="text-success" /> : <Copy size={11} />}
+                      {copied ? "Copied" : "Copy link"}
+                    </button>
+                    {article.wordpressUrl && (
+                      <a
+                        href={article.wordpressUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-lg bg-white/80 border border-line px-2 py-1 text-[11px] font-medium text-ink hover:bg-white transition"
+                      >
+                        <ExternalLink size={11} /> WordPress
+                      </a>
+                    )}
+                  </div>
+                </div>
               )}
               {canPublish ? (
                 <div className="space-y-2">
@@ -443,7 +539,7 @@ export default function EditorPage() {
                     icon={PenLine}
                     className="w-full"
                     loading={publishing === "draft"}
-                    disabled={publishing !== null}
+                    disabled={publishing !== null || deleting}
                     onClick={() => handlePublish("draft")}
                   >
                     Save WP draft
@@ -453,13 +549,27 @@ export default function EditorPage() {
                     icon={Globe}
                     className="w-full"
                     loading={publishing === "publish"}
-                    disabled={publishing !== null}
+                    disabled={publishing !== null || deleting}
                     onClick={() => handlePublish("publish")}
                   >
                     {isPublished ? "Update live" : "Publish live"}
                   </Button>
+                  {isPublished && (
+                    <Button
+                      variant="ghost"
+                      icon={Undo2}
+                      className="w-full"
+                      loading={publishing === "draft"}
+                      disabled={publishing !== null || deleting}
+                      onClick={handleUnpublish}
+                    >
+                      Move back to draft
+                    </Button>
+                  )}
                   <p className="text-[11px] text-muted">
-                    Live publishes to your frontend now; WordPress is a best-effort mirror.
+                    {isPublished
+                      ? "“Move back to draft” takes the post off your live site but keeps all content."
+                      : "Live publishes to your frontend now; WordPress is a best-effort mirror."}
                   </p>
                 </div>
               ) : (
@@ -644,6 +754,30 @@ export default function EditorPage() {
                 </p>
               </div>
             </Panel>
+
+            {/* Danger zone — permanent delete */}
+            <div className="glass p-4 animate-fade-up border-danger/20">
+              <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-ink">
+                <span className="grid place-items-center h-7 w-7 rounded-lg bg-danger-soft text-danger">
+                  <Trash2 size={14} />
+                </span>
+                Danger zone
+              </div>
+              <p className="text-[11px] text-muted mb-3">
+                Permanently delete this post and all its data. If it's live, it's
+                removed from your site too. This cannot be undone.
+              </p>
+              <Button
+                variant="ghost"
+                icon={Trash2}
+                className="w-full !text-danger hover:!bg-danger-soft"
+                loading={deleting}
+                disabled={deleting || publishing !== null}
+                onClick={handleDelete}
+              >
+                Delete post
+              </Button>
+            </div>
           </div>
         </div>
       </div>
