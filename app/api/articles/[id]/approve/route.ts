@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { apiError } from "@/lib/apiError";
 
 // DB-backed route: never prerender at build time (would try to hit the DB).
 export const dynamic = "force-dynamic";
@@ -12,6 +13,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  try {
   const article = await prisma.article.findUnique({
     where: { id: params.id },
     include: { humanInputMarkers: true },
@@ -75,4 +77,7 @@ export async function POST(
   });
 
   return NextResponse.json({ article: updated });
+  } catch (error) {
+    return apiError(error);
+  }
 }

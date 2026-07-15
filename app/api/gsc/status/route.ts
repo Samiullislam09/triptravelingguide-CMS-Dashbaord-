@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { apiError } from "@/lib/apiError";
 import { isGscConfigured, getProperty, verifyGscAuth } from "@/lib/gsc";
 
 // Reads AppConfig + (optionally) verifies live auth: never prerender.
@@ -8,6 +9,7 @@ export const dynamic = "force-dynamic";
 // GET /api/gsc/status — used by the SEO page + Overview banner to decide
 // whether to show "Connect GSC" or the real dashboard.
 export async function GET() {
+  try {
   const configured = isGscConfigured();
 
   const [lastSyncRow, propertyRow] = await Promise.all([
@@ -31,4 +33,7 @@ export async function GET() {
     property: propertyRow?.value || (configured ? getProperty() : undefined),
     lastSync: lastSyncRow?.value || undefined,
   });
+  } catch (error) {
+    return apiError(error);
+  }
 }

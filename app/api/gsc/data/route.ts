@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { apiError } from "@/lib/apiError";
 
 // Reads KeywordMetric / PageMetric: never prerender at build time.
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ interface QueryAgg {
 // position-bucket distribution, top pages, top queries, and "quick win"
 // opportunity keywords (ranking 5-25 with real impressions).
 export async function GET() {
+  try {
   const windowStart = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000);
 
   const [keywordRows, pageRows] = await Promise.all([
@@ -95,4 +97,7 @@ export async function GET() {
     topQueries,
     opportunities,
   });
+  } catch (error) {
+    return apiError(error);
+  }
 }

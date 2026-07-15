@@ -10,6 +10,7 @@ build
 .env
 .env.local
 .env*.local
+vercel-db-urls.txt
 
 # database
 prisma/dev.db

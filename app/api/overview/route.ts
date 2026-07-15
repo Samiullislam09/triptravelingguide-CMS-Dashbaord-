@@ -15,7 +15,20 @@ function dayKey(d: Date): string {
 export async function GET() {
   try {
   const [articles, storyCount, gscTotals, opportunities] = await Promise.all([
-    prisma.article.findMany({ orderBy: { createdAt: "desc" } }),
+    // Only the columns the overview actually uses — NEVER pull the heavy
+    // contentHtml/contentMarkdown for all posts (that made this call slow).
+    prisma.article.findMany({
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        needsRewrite: true,
+        coverImageUrl: true,
+        createdAt: true,
+        publishedAt: true,
+      },
+    }),
     prisma.webStory.count(),
     // GSC page metrics over the trailing 28 days (empty until GSC is connected).
     prisma.pageMetric.findMany({
@@ -117,6 +130,10 @@ export async function GET() {
       coverImageUrl: a.coverImageUrl,
       updatedAt: a.createdAt,
     })),
+  }, {
+    // Serve instantly from the browser cache on quick re-navigation, revalidate
+    // in the background. Short window keeps the dashboard feeling live.
+    headers: { "Cache-Control": "private, max-age=10, stale-while-revalidate=30" },
   });
   } catch (error) {
     return apiError(error);

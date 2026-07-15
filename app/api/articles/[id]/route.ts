@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { apiError } from "@/lib/apiError";
 
 // DB-backed route: never prerender at build time (would try to hit the DB).
 export const dynamic = "force-dynamic";
@@ -10,20 +11,24 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const article = await prisma.article.findUnique({
-    where: { id: params.id },
-    include: {
-      humanInputMarkers: true,
-      externalLinks: true,
-      internalLinks: { include: { targetArticle: true } },
-    },
-  });
+  try {
+    const article = await prisma.article.findUnique({
+      where: { id: params.id },
+      include: {
+        humanInputMarkers: true,
+        externalLinks: true,
+        internalLinks: { include: { targetArticle: true } },
+      },
+    });
 
-  if (!article) {
-    return NextResponse.json({ error: "Article not found" }, { status: 404 });
+    if (!article) {
+      return NextResponse.json({ error: "Article not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ article });
+  } catch (error) {
+    return apiError(error);
   }
-
-  return NextResponse.json({ article });
 }
 
 // PATCH /api/articles/[id] — edit content, or resolve/unresolve a marker
@@ -31,6 +36,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  try {
   const body = await request.json();
 
   if (body.action === "resolve_marker") {
@@ -137,4 +143,7 @@ export async function PATCH(
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+  } catch (error) {
+    return apiError(error);
+  }
 }
