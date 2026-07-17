@@ -1,49 +1,80 @@
-// One-off: insert a hand-written article as a pending_review DRAFT (no auto-publish).
-// Usage:  node --env-file=.env scripts/insert-draft.mjs <path-to-html> <slug>
-// Reads the HTML body, computes wordCount, and creates the Article row via Prisma.
+// Insert a hand-written article as a pending_review DRAFT. Never auto-publishes:
+// a named human approves it in the CMS before it goes live.
+//
+// Usage: node --env-file=.env scripts/insert-draft.mjs <meta.json>
+//
+// meta.json holds every Article field plus `htmlPath` (relative to the json
+// file). wordCount is computed from the HTML, never taken from the json.
 import { readFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
 import { PrismaClient } from "@prisma/client";
 
-const [, , htmlPath, slugArg] = process.argv;
-if (!htmlPath || !slugArg) {
-  console.error("Usage: node --env-file=.env scripts/insert-draft.mjs <html> <slug>");
+const [, , metaPath] = process.argv;
+if (!metaPath) {
+  console.error("Usage: node --env-file=.env scripts/insert-draft.mjs <meta.json>");
   process.exit(1);
 }
 
-const contentHtml = readFileSync(htmlPath, "utf8");
-const text = contentHtml.replace(/<[^>]+>/g, " ").replace(/&[a-z#0-9]+;/gi, " ").replace(/\s+/g, " ").trim();
+const meta = JSON.parse(readFileSync(metaPath, "utf8"));
+const { htmlPath, ...fields } = meta;
+if (!htmlPath) {
+  console.error("meta.json must set htmlPath");
+  process.exit(1);
+}
+
+const contentHtml = readFileSync(resolve(dirname(metaPath), htmlPath), "utf8");
+const text = contentHtml
+  .replace(/<[^>]+>/g, " ")
+  .replace(/&[a-z#0-9]+;/gi, " ")
+  .replace(/\s+/g, " ")
+  .trim();
 const wordCount = text ? text.split(" ").length : 0;
+
+// Em dashes are banned house-wide (WRITING_RULES.md §6). Fail closed rather than
+// let one reach the CMS, where it would have to be caught by eye.
+if (/—|&mdash;/.test(contentHtml)) {
+  console.error("REFUSED: draft contains an em dash. Rewrite the sentence.");
+  process.exit(1);
+}
 
 const prisma = new PrismaClient();
 
 const data = {
-  title: "Is Food Included on Cordelia Cruise? Dining Guide",
-  slug: slugArg,
-  status: "pending_review", // editable draft in the CMS — human approves before publish
+  status: "pending_review",
   source: "manual",
-  comparisonType: "stay",
-  primaryKeyword: "cordelia cruise food",
-  metaTitle: "Cordelia Cruise Food & Dining: What's Free vs Paid (2026)",
-  metaDescription:
-    "On Cordelia Cruise, buffet meals at Starlight and Food Court are included; Chopstix, the grill and all drinks cost extra. Full food, dining and price guide.",
-  contentHtml,
   contentMarkdown: "",
-  wordCount,
-  categoryName: "Cruises",
-  categorySlug: "cruises",
-  coverImageAlt: "Buffet dining spread on board a Cordelia cruise ship",
-  tags: "cordelia cruise, cordelia cruise food, cruise dining, cordelia menu, cruise from india",
   needsRewrite: false,
+  ...fields,
+  contentHtml,
+  wordCount,
 };
 
 async function main() {
-  const existing = await prisma.article.findUnique({ where: { slug: slugArg } });
+  if (data.status === "published") {
+    console.error("REFUSED: this script never publishes. Approve in the CMS instead.");
+    process.exit(1);
+  }
+  const existing = await prisma.article.findUnique({ where: { slug: data.slug } });
   if (existing) {
-    console.log(`SKIP: a post with slug "${slugArg}" already exists (id ${existing.id}, status ${existing.status}). Nothing inserted.`);
+    console.log(
+      `SKIP: slug "${data.slug}" already exists (id ${existing.id}, status ${existing.status}). Nothing inserted.`
+    );
     return;
   }
   const article = await prisma.article.create({ data });
-  console.log(JSON.stringify({ id: article.id, slug: article.slug, status: article.status, wordCount: article.wordCount, title: article.title }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        id: article.id,
+        slug: article.slug,
+        status: article.status,
+        wordCount: article.wordCount,
+        title: article.title,
+      },
+      null,
+      2
+    )
+  );
 }
 
 main()
