@@ -8,9 +8,15 @@
 import sharp from "sharp";
 import { createClient } from "@supabase/supabase-js";
 
-const [slug, ...pairs] = process.argv.slice(2);
+// Web Story frames are portrait. storyImage() in the frontend appends Unsplash
+// crop params that Supabase storage ignores, so a story image has to be stored
+// at the right aspect ratio already or AMP letterboxes it.
+const args = process.argv.slice(2);
+const portrait = args.includes("--portrait");
+const [slug, ...pairs] = args.filter((a) => a !== "--portrait");
+const [W, H] = portrait ? [720, 1280] : [1200, 675];
 if (!slug || pairs.length === 0) {
-  console.error("usage: host-images.mjs <slug> <key>=<photo-id> ...");
+  console.error("usage: host-images.mjs [--portrait] <slug> <key>=<photo-id> ...");
   process.exit(1);
 }
 
@@ -39,7 +45,7 @@ for (const p of picks) {
     continue;
   }
   const raw = Buffer.from(await res.arrayBuffer());
-  const out = await sharp(raw).resize(1200, 675, { fit: "cover" }).jpeg({ quality: 82 }).toBuffer();
+  const out = await sharp(raw).resize(W, H, { fit: "cover" }).jpeg({ quality: 82 }).toBuffer();
   const path = `articles/${slug}/${p.key}.jpg`;
   const { error } = await supabase.storage
     .from("post-images")
