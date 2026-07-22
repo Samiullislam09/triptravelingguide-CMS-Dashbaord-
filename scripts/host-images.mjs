@@ -37,8 +37,13 @@ const supabase = createClient(
 
 let failed = 0;
 for (const p of picks) {
-  const src = `https://images.unsplash.com/photo-${p.id}?w=1600&q=85&fm=jpg`;
-  const res = await fetch(src);
+  // Unsplash has no photo of most places we write about. Wikimedia Commons often
+  // does, under CC0/CC-BY, and a real photo of the actual place beats generic
+  // stock. So accept a full URL in place of a bare Unsplash id.
+  const src = /^https?:\/\//.test(p.id)
+    ? p.id
+    : `https://images.unsplash.com/photo-${p.id}?w=1600&q=85&fm=jpg`;
+  const res = await fetch(src, { headers: { "User-Agent": "TripTravelingGuide/1.0" } });
   if (!res.ok) {
     console.error(`FAIL ${p.key}: HTTP ${res.status}`);
     failed++;

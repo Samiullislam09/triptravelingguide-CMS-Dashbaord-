@@ -56,7 +56,11 @@ if (restoreIdx !== -1) {
   process.exit(0);
 }
 
-const targets = [...PRUNE, ...STUBS];
+// Bare slug arguments override the hardcoded batch above. The lists exist for
+// the one-off July 2026 sweep; later prunes are usually one or two URLs being
+// merged into a rewrite, and they still want the backup and restore path.
+const argSlugs = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+const targets = argSlugs.length ? argSlugs : [...PRUNE, ...STUBS];
 const rows = await prisma.article.findMany({ where: { slug: { in: targets } } });
 
 const missing = targets.filter((s) => !rows.some((r) => r.slug === s));
