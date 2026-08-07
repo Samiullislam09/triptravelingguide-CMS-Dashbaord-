@@ -1,11 +1,15 @@
 // Download picked Unsplash photos, resize, and re-host them in Supabase
 // `post-images` so the site never hotlinks a third-party CDN.
 //
-// Usage: node --env-file=.env scripts/host-images.mjs <slug> <key>=<photo-id> ...
+// Usage: node --env-file=.env scripts/host-images.mjs [--portrait] <slug> <key>=<source> ...
 //   node --env-file=.env scripts/host-images.mjs cordelia-cruise-rules cover=1502301197179-65228ab57f78
 //
-// The photo id is the part after "photo-" in an images.unsplash.com URL.
+// <source> is any of three things:
+//   - a bare Unsplash photo id (the part after "photo-" in an images.unsplash.com URL)
+//   - a full https:// URL (Wikimedia Commons, etc.)
+//   - a path to a local file already on disk
 import sharp from "sharp";
+import { existsSync, readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 
 // Web Story frames are portrait. storyImage() in the frontend appends Unsplash
@@ -40,16 +44,33 @@ for (const p of picks) {
   // Unsplash has no photo of most places we write about. Wikimedia Commons often
   // does, under CC0/CC-BY, and a real photo of the actual place beats generic
   // stock. So accept a full URL in place of a bare Unsplash id.
-  const src = /^https?:\/\//.test(p.id)
-    ? p.id
-    : `https://images.unsplash.com/photo-${p.id}?w=1600&q=85&fm=jpg`;
-  const res = await fetch(src, { headers: { "User-Agent": "TripTravelingGuide/1.0" } });
-  if (!res.ok) {
-    console.error(`FAIL ${p.key}: HTTP ${res.status}`);
-    failed++;
-    continue;
+  //
+  // Also accept a LOCAL FILE PATH. Every candidate has to be opened and looked at
+  // before it ships anyway (a "Deep Creek Lake in December" photo turned out to
+  // have no snow in it), so the file is usually already on disk by then. Reusing
+  // it avoids a second download, and Wikimedia rate-limits (HTTP 429) repeat
+  // fetches hard.
+  let raw;
+  if (/^https?:\/\//.test(p.id) || !existsSync(p.id)) {
+    const src = /^https?:\/\//.test(p.id)
+      ? p.id
+      : `https://images.unsplash.com/photo-${p.id}?w=1600&q=85&fm=jpg`;
+    // Wikimedia's policy asks for a descriptive agent with a contact route.
+    const res = await fetch(src, {
+      headers: {
+        "User-Agent":
+          "TripTravelingGuide/1.0 (https://triptravelingguide.com; musab@cgheven.com)",
+      },
+    });
+    if (!res.ok) {
+      console.error(`FAIL ${p.key}: HTTP ${res.status}`);
+      failed++;
+      continue;
+    }
+    raw = Buffer.from(await res.arrayBuffer());
+  } else {
+    raw = readFileSync(p.id);
   }
-  const raw = Buffer.from(await res.arrayBuffer());
   const out = await sharp(raw).resize(W, H, { fit: "cover" }).jpeg({ quality: 82 }).toBuffer();
   const path = `articles/${slug}/${p.key}.jpg`;
   const { error } = await supabase.storage
