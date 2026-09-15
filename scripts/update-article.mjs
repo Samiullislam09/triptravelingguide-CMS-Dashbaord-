@@ -68,7 +68,14 @@ async function main() {
 
   // Bumping publishedAt is what moves dateModified and the sitemap lastmod, so
   // do it only because the content really changed, which for a rewrite it has.
-  const data = { ...fields, contentHtml, wordCount, needsRewrite: false, publishedAt: new Date() };
+  //
+  // But ONLY for a page that is actually live. Stamping an unpublished draft
+  // backdates it: publish/route.ts does `publishedAt: article.publishedAt ?? new Date()`,
+  // so the draft would go live carrying the day it was edited, and that wrong
+  // date feeds datePublished in the JSON-LD and lastmod in the sitemap. Caught
+  // on winter-snow-predictions-usa, then hit again editing the Pennsylvania draft.
+  const data = { ...fields, contentHtml, wordCount, needsRewrite: false };
+  if (existing.status === "published") data.publishedAt = new Date();
 
   console.log(`slug          ${slug}`);
   console.log(`status        ${existing.status} (unchanged)`);
@@ -76,6 +83,11 @@ async function main() {
   console.log(`title         ${existing.title}`);
   console.log(`           -> ${data.title ?? existing.title}`);
   console.log(`needsRewrite  ${existing.needsRewrite} -> false`);
+  console.log(
+    `publishedAt   ${
+      data.publishedAt ? `${existing.publishedAt} -> now` : `${existing.publishedAt} (untouched, not published)`
+    }`
+  );
 
   if (!apply) {
     console.log("\nDRY RUN. Nothing written. Re-run with --apply to commit.");

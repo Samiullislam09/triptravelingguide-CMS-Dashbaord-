@@ -1,5 +1,11 @@
-// One-off: render a brand cover thumbnail for one article, upload it to Supabase
-// `post-images`, and set it as the article's cover — WITHOUT the dev server.
+// One-off: render a brand cover thumbnail for one article, write it into the
+// frontend's public/media/ folder, and set it as the article's cover —
+// WITHOUT the dev server.
+//
+// Used to upload to Supabase `post-images`, but Supabase's Free plan serves
+// every public object with Cache-Control: no-cache regardless of the
+// cacheControl set at upload time, so every request re-fetched from origin
+// and drove egress to 202% of quota. See host-images.mjs for the full story.
 //
 // NOTE: the production thumbnail route uses next/og (@vercel/og), which works on
 // Vercel/Linux but throws "Invalid URL" on this Windows box (a known @vercel/og
@@ -8,8 +14,11 @@
 //
 // Usage: node --env-file=.env scripts/gen-thumbnail.mjs <articleId>
 import sharp from "sharp";
-import { createClient } from "@supabase/supabase-js";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { PrismaClient } from "@prisma/client";
+
+const FRONTEND_PUBLIC = "D:/Trip_traveling_guide_auto_dashboard/Triptravelingguide_frontend/public";
 
 const articleId = process.argv[2];
 if (!articleId) {
@@ -85,18 +94,13 @@ async function main() {
   const png = await sharp(Buffer.from(svg)).png().toBuffer();
   console.log(`Rendered PNG: ${png.length} bytes`);
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  );
-  const path = `thumbnails/${article.id}-${Date.now()}.png`;
-  const { error: upErr } = await supabase.storage
-    .from("post-images")
-    .upload(path, png, { contentType: "image/png", upsert: true });
-  if (upErr) throw new Error(`Upload failed: ${upErr.message}`);
-  const url = supabase.storage.from("post-images").getPublicUrl(path).data.publicUrl;
-  console.log(`Uploaded -> ${url}`);
+  const relPath = `media/thumbnails/${article.id}-${Date.now()}.png`;
+  const dest = join(FRONTEND_PUBLIC, relPath);
+  mkdirSync(dirname(dest), { recursive: true });
+  writeFileSync(dest, png);
+  const url = `/${relPath}`;
+  console.log(`Written -> public/${relPath}`);
+  console.log(`Now in the frontend repo: git add public/media, commit, and push.`);
 
   const updated = await prisma.article.update({
     where: { id: article.id },

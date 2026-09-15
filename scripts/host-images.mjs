@@ -1,5 +1,16 @@
-// Download picked Unsplash photos, resize, and re-host them in Supabase
-// `post-images` so the site never hotlinks a third-party CDN.
+// Download picked Unsplash/Wikimedia photos, resize, and write them straight
+// into the frontend's public/media/ folder as static files.
+//
+// Used to upload to Supabase `post-images`, but Supabase's Free plan serves
+// every public object with Cache-Control: no-cache regardless of the
+// cacheControl set at upload time (verified directly), so every pageview and
+// crawler hit re-fetched every image from origin. That drove the org's egress
+// to 202% of its free-tier quota. See the "Move CMS-uploaded images from
+// Supabase to public/media" commit in the frontend repo. Vercel's own
+// /_next/image optimizer is not an alternative either: it already broke every
+// image site-wide once when its transformation quota ran out (unoptimized:
+// true in next.config.mjs). Plain static files under public/ get Vercel's
+// ordinary long-lived edge caching with none of that risk.
 //
 // Usage: node --env-file=.env scripts/host-images.mjs [--portrait] <slug> <key>=<source> ...
 //   node --env-file=.env scripts/host-images.mjs cordelia-cruise-rules cover=1502301197179-65228ab57f78
@@ -8,13 +19,19 @@
 //   - a bare Unsplash photo id (the part after "photo-" in an images.unsplash.com URL)
 //   - a full https:// URL (Wikimedia Commons, etc.)
 //   - a path to a local file already on disk
+//
+// Prints the root-relative /media/... URL to use in contentHtml /
+// coverImageUrl. After running this, `git add public/media`, commit and push
+// the frontend repo, same as any other content change.
 import sharp from "sharp";
-import { existsSync, readFileSync } from "node:fs";
-import { createClient } from "@supabase/supabase-js";
+import { existsSync, readFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+
+const FRONTEND_PUBLIC = "D:/Trip_traveling_guide_auto_dashboard/Triptravelingguide_frontend/public";
 
 // Web Story frames are portrait. storyImage() in the frontend appends Unsplash
-// crop params that Supabase storage ignores, so a story image has to be stored
-// at the right aspect ratio already or AMP letterboxes it.
+// crop params that static files ignore, so a story image has to be stored at
+// the right aspect ratio already or AMP letterboxes it.
 const args = process.argv.slice(2);
 const portrait = args.includes("--portrait");
 const [slug, ...pairs] = args.filter((a) => a !== "--portrait");
@@ -32,12 +49,6 @@ const picks = pairs.map((p) => {
   }
   return { key, id };
 });
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  { auth: { persistSession: false, autoRefreshToken: false } }
-);
 
 let failed = 0;
 for (const p of picks) {
@@ -72,17 +83,16 @@ for (const p of picks) {
     raw = readFileSync(p.id);
   }
   const out = await sharp(raw).resize(W, H, { fit: "cover" }).jpeg({ quality: 82 }).toBuffer();
-  const path = `articles/${slug}/${p.key}.jpg`;
-  const { error } = await supabase.storage
-    .from("post-images")
-    .upload(path, out, { contentType: "image/jpeg", upsert: true });
-  if (error) {
-    console.error(`UPLOAD FAIL ${p.key}: ${error.message}`);
-    failed++;
-    continue;
-  }
-  const url = supabase.storage.from("post-images").getPublicUrl(path).data.publicUrl;
-  console.log(`${p.key}\t${out.length}B\t${url}`);
+  const relPath = `media/articles/${slug}/${p.key}.jpg`;
+  const dest = join(FRONTEND_PUBLIC, relPath);
+  mkdirSync(dirname(dest), { recursive: true });
+  writeFileSync(dest, out);
+  console.log(`${p.key}\t${out.length}B\t/${relPath}`);
 }
 
+if (!failed) {
+  console.log(
+    `\nWritten to public/media. Now in the frontend repo: git add public/media, commit, and push.`
+  );
+}
 process.exit(failed ? 1 : 0);
