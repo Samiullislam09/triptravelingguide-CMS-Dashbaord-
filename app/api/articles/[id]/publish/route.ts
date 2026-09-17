@@ -88,5 +88,25 @@ export async function POST(
     },
   });
 
-  return NextResponse.json({ article: updated, wordpress, wordpressError });
+  // Tell Bing/Yandex (IndexNow) the new URL exists right away, instead of
+  // waiting for their next scheduled crawl. This has never actually been
+  // wired up before — the frontend's /api/indexnow route existed but nothing
+  // called it. Best-effort: a failure here must never block the publish that
+  // already succeeded above.
+  let indexNow: { ok: boolean; submitted?: number; error?: string } | null = null;
+  try {
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://triptravelingguide.com";
+    const url = `${siteUrl.replace(/\/$/, "")}/${updated.slug}/`;
+    const res = await fetch(`${siteUrl.replace(/\/$/, "")}/api/indexnow`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ urls: [url] }),
+    });
+    indexNow = await res.json().catch(() => ({ ok: res.ok }));
+  } catch (error: any) {
+    console.error("IndexNow ping failed (non-blocking):", error);
+    indexNow = { ok: false, error: error?.message || "IndexNow ping failed" };
+  }
+
+  return NextResponse.json({ article: updated, wordpress, wordpressError, indexNow });
 }
