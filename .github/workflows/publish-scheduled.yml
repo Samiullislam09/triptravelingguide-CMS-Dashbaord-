@@ -1,0 +1,24 @@
+name: Publish scheduled posts
+
+# Vercel's Hobby plan allows one cron run a day, which is too coarse for
+# "publish at 9:00". GitHub Actions calls the CMS every 10 minutes instead.
+# The endpoint only publishes posts the owner scheduled from the dashboard.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  publish-due:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Call publish-due
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error --max-time 60 --retry 2 \
+            -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            https://cms.triptravelingguide.com/api/cron/publish-due

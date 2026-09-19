@@ -29,6 +29,10 @@ export async function middleware(request: NextRequest) {
     pathname === "/api/auth/login" ||
     // Public, read-only content API consumed by the Vercel frontend.
     pathname.startsWith("/api/public") ||
+    // Scheduled-publish cron: has no dashboard session. It is safe because it
+    // only acts on schedules created from the signed-in dashboard, re-checks
+    // the publish gates, and requires CRON_SECRET when that env var is set.
+    pathname.startsWith("/api/cron") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon");
 

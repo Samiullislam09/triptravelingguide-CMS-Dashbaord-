@@ -34,6 +34,7 @@ interface Article {
   status: string;
   primaryKeyword: string;
   wordCount: number;
+  scheduledFor?: string | null;
   categoryName: string;
   comparisonType: string;
   coverImageUrl: string;
@@ -307,6 +308,15 @@ function ContentPageInner() {
                       </span>
                       <span className="flex flex-wrap items-center gap-2 mt-1">
                         <Badge tone={statusTone(a.status)}>{a.status.replace(/_/g, " ")}</Badge>
+                        {a.scheduledFor && a.status !== "published" && (
+                          <Badge tone="brand">
+                            Scheduled{" "}
+                            {new Date(a.scheduledFor).toLocaleString(undefined, {
+                              dateStyle: "medium",
+                              timeStyle: "short",
+                            })}
+                          </Badge>
+                        )}
                         {category && <Badge tone="neutral">{category}</Badge>}
                         <span className="text-xs text-muted">{a.wordCount} words</span>
                         {a.needsRewrite && (

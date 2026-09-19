@@ -28,8 +28,15 @@ export async function GET() {
         humanInputMarkers: { select: { id: true, resolved: true } },
       },
     });
+    // Pending scheduled publishes, so the list can show "Scheduled for ...".
+    const pending = await prisma.publishSchedule.findMany({
+      where: { published: false },
+      select: { articleId: true, scheduledFor: true },
+    });
+    const scheduledFor = new Map(pending.map((s) => [s.articleId, s.scheduledFor.toISOString()]));
+    const withSchedule = articles.map((a) => ({ ...a, scheduledFor: scheduledFor.get(a.id) ?? null }));
     return NextResponse.json(
-      { articles },
+      { articles: withSchedule },
       { headers: { "Cache-Control": "private, max-age=10, stale-while-revalidate=30" } },
     );
   } catch (error) {

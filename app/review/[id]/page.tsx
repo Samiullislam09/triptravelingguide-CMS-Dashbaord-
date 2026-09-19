@@ -24,6 +24,8 @@ import {
   Trash2,
   Copy,
   Undo2,
+  CalendarClock,
+  X,
 } from "lucide-react";
 
 // The public frontend serves posts at /<slug>. Override with NEXT_PUBLIC_SITE_URL.
@@ -62,6 +64,28 @@ interface Article {
   wordpressUrl?: string | null;
 }
 
+interface ScheduleInfo {
+  id: string;
+  scheduledFor: string;
+}
+
+// "yyyy-MM-ddTHH:mm" in the browser's local time, the format <input type="datetime-local"> wants.
+function toLocalInput(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function tomorrowAt(hour: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(hour, 0, 0, 0);
+  return toLocalInput(d);
+}
+
+function formatLocal(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
 export default function EditorPage() {
   const params = useParams();
   const router = useRouter();
@@ -93,6 +117,11 @@ export default function EditorPage() {
   const [approveThumb, setApproveThumb] = useState(false);
   const [genStory, setGenStory] = useState(false);
   const [storyDone, setStoryDone] = useState(false);
+  // scheduled publishing
+  const [schedule, setSchedule] = useState<ScheduleInfo | null>(null);
+  const [scheduleAt, setScheduleAt] = useState("");
+  const [scheduling, setScheduling] = useState(false);
+  const [scheduleBlock, setScheduleBlock] = useState("");
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirtyRef = useRef(false);
@@ -120,6 +149,23 @@ export default function EditorPage() {
   useEffect(() => {
     fetchArticle();
   }, [fetchArticle]);
+
+  const fetchSchedule = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/articles/${id}/schedule`);
+      const data = await res.json();
+      if (res.ok) {
+        setSchedule(data.schedule);
+        setScheduleBlock(data.gates && !data.gates.ok ? data.gates.reason || "" : "");
+      }
+    } catch {
+      /* the schedule panel just stays empty */
+    }
+  }, [id]);
+
+  useEffect(() => {
+    fetchSchedule();
+  }, [fetchSchedule]);
 
   const doSave = useCallback(async () => {
     setSaveState("saving");
@@ -216,6 +262,56 @@ export default function EditorPage() {
       fetchArticle();
     } finally {
       setPublishing(null);
+    }
+  }
+
+  async function handleSchedule() {
+    setError("");
+    if (!scheduleAt) {
+      setError("Pick a date and time first.");
+      return;
+    }
+    setScheduling(true);
+    try {
+      if (dirtyRef.current) await doSave();
+      let overrideCap = false;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const res = await fetch(`/api/articles/${id}/schedule`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ scheduledFor: new Date(scheduleAt).toISOString(), overrideCap }),
+        });
+        const data = await res.json();
+        if (res.status === 409 && data.gate === "weekly_cap") {
+          if (!window.confirm(`${data.error}\n\nSchedule it anyway?`)) return;
+          overrideCap = true;
+          continue;
+        }
+        if (!res.ok) {
+          setError(data.error || "Couldn't schedule this post.");
+          return;
+        }
+        setSchedule(data.schedule);
+        return;
+      }
+    } finally {
+      setScheduling(false);
+    }
+  }
+
+  async function handleCancelSchedule() {
+    setError("");
+    setScheduling(true);
+    try {
+      const res = await fetch(`/api/articles/${id}/schedule`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Couldn't cancel the schedule.");
+        return;
+      }
+      setSchedule(null);
+    } finally {
+      setScheduling(false);
     }
   }
 
@@ -554,6 +650,63 @@ export default function EditorPage() {
                   >
                     {isPublished ? "Update live" : "Publish live"}
                   </Button>
+                  {!isPublished && (
+                    <div className="rounded-xl border border-line bg-white/60 p-3 space-y-2">
+                      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                        <CalendarClock size={12} /> Schedule
+                      </div>
+                      {schedule && (
+                        <div className="flex items-center justify-between gap-2 rounded-lg bg-slate-100 px-2.5 py-2">
+                          <span className="text-xs text-ink">
+                            Goes live <strong>{formatLocal(schedule.scheduledFor)}</strong>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleCancelSchedule}
+                            disabled={scheduling}
+                            className="inline-flex items-center gap-1 text-[11px] font-medium text-muted hover:text-ink disabled:opacity-50"
+                            title="Cancel the scheduled publish"
+                          >
+                            <X size={12} /> Cancel
+                          </button>
+                        </div>
+                      )}
+                      <input
+                        type="datetime-local"
+                        value={scheduleAt}
+                        min={toLocalInput(new Date())}
+                        onChange={(e) => setScheduleAt(e.target.value)}
+                        className="w-full rounded-lg border border-line bg-white px-2.5 py-2 text-xs text-ink"
+                      />
+                      <div className="flex flex-wrap gap-1.5">
+                        {[8, 9, 12, 18].map((h) => (
+                          <button
+                            key={h}
+                            type="button"
+                            onClick={() => setScheduleAt(tomorrowAt(h))}
+                            className="rounded-lg border border-line bg-white px-2 py-1 text-[11px] font-medium text-ink hover:bg-slate-50 transition"
+                          >
+                            Tomorrow {h > 12 ? h - 12 : h}
+                            {h >= 12 ? " PM" : " AM"}
+                          </button>
+                        ))}
+                      </div>
+                      <Button
+                        variant="soft"
+                        icon={CalendarClock}
+                        className="w-full"
+                        loading={scheduling}
+                        disabled={scheduling || publishing !== null || deleting || !!scheduleBlock}
+                        onClick={handleSchedule}
+                      >
+                        {schedule ? "Reschedule" : "Schedule publish"}
+                      </Button>
+                      <p className="text-[11px] text-muted">
+                        {scheduleBlock ||
+                          "Uses your browser time zone. Goes live within about 10 minutes of the time you pick."}
+                      </p>
+                    </div>
+                  )}
                   {isPublished && (
                     <Button
                       variant="ghost"
