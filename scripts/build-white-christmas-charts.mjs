@@ -138,3 +138,31 @@ if (src && existsSync(src)) {
   writeFileSync(DIR + "story-1.jpg", buf);
   console.log("wrote story-1.jpg", buf.length + "B");
 }
+
+// ---------- chart-trend: illustrative shrinking-odds example (Zarzycki, Sci Am) ----------
+{
+  const W = 1200, H = 640;
+  let svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" ${FONT}>
+<rect width="${W}" height="${H}" fill="#ffffff"/>
+<text x="40" y="46" font-size="28" font-weight="700" fill="#111">A warming climate narrows the window for snow</text>
+<text x="40" y="72" font-size="17" fill="#555">One scientist's own illustration of the scale of the shift, not a measured forecast for these towns.</text>`;
+  const L = 300, R = 1140, max = 90;
+  const x = (v) => L + (v / max) * (R - L);
+  const rows = [
+    ["Southern Ohio", "today", 15, "#f97316"],
+    ["Southern Ohio", "as warming continues", 5, "#fdba74"],
+    ["Northern Vermont", "today", 85, "#0e7490"],
+    ["Northern Vermont", "as warming continues", 75, "#7dd3fc"],
+  ];
+  const top = 120, rowH = 90;
+  rows.forEach(([place, when, pct, color], i) => {
+    const y = top + i * rowH;
+    svg += `<text x="290" y="${y + 20}" font-size="20" font-weight="700" fill="#111" text-anchor="end">${esc(place)}</text>`;
+    svg += `<text x="290" y="${y + 42}" font-size="15" fill="#666" text-anchor="end">${esc(when)}</text>`;
+    svg += `<rect x="${L}" y="${y + 4}" width="${x(pct) - L}" height="34" rx="10" fill="${color}"/>`;
+    svg += `<text x="${x(pct) + 12}" y="${y + 27}" font-size="20" font-weight="700" fill="#111">${pct}%</text>`;
+  });
+  svg += `<line x1="${L}" y1="${top - 10}" x2="${L}" y2="${top + rows.length * rowH - 20}" stroke="#ddd" stroke-width="2"/>`;
+  svg += `<text x="40" y="${H - 24}" font-size="15" fill="#666">Source: Colin Zarzycki (Penn State), via Scientific American, 22 Dec 2025. Chart: TripTravelingGuide.</text></svg>`;
+  await save("chart-trend.jpg", svg, W, H);
+}
