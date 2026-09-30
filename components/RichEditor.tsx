@@ -18,6 +18,7 @@ import CharacterCount from "@tiptap/extension-character-count";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import { cn } from "@/components/ui";
+import { absolutizeMediaSrcs, relativizeMediaSrcs } from "@/lib/media-url";
 import {
   Bold,
   Italic,
@@ -131,7 +132,9 @@ export default function RichEditor({
       TaskItem.configure({ nested: true }),
       CharacterCount,
     ],
-    content: initialHtml || "",
+    // Absolutized only for on-screen rendering; onUpdate below converts back
+    // to root-relative paths before it ever reaches onChange/storage.
+    content: absolutizeMediaSrcs(initialHtml || ""),
     editorProps: {
       attributes: {
         class: "tiptap article-content focus:outline-none",
@@ -165,7 +168,7 @@ export default function RichEditor({
     onCreate: ({ editor }) => {
       editorRef.current = editor;
     },
-    onUpdate: ({ editor }) => onChange(editor.getHTML()),
+    onUpdate: ({ editor }) => onChange(relativizeMediaSrcs(editor.getHTML())),
   });
 
   // Lock the page behind the editor while in fullscreen mode.

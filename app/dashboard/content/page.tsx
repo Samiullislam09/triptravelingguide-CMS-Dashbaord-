@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { mediaUrl } from "@/lib/media-url";
 import {
   Card,
   Button,
@@ -294,7 +295,7 @@ function ContentPageInner() {
                     {thumb ? (
                       <span
                         className="h-12 w-16 rounded-lg bg-cover bg-center shrink-0 bg-slate-100 border border-line"
-                        style={{ backgroundImage: `url(${thumb})` }}
+                        style={{ backgroundImage: `url(${mediaUrl(thumb)})` }}
                       />
                     ) : (
                       <span className="h-12 w-16 rounded-lg shrink-0 bg-slate-100 border border-line grid place-items-center text-slate-300">

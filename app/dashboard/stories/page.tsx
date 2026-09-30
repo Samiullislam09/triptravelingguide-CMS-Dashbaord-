@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { mediaUrl } from "@/lib/media-url";
 import {
   Card,
   Button,
@@ -155,7 +156,7 @@ export default function StoriesPage() {
               <div
                 className="h-36 bg-cover bg-center bg-slate-100 relative"
                 style={
-                  story.coverImageUrl ? { backgroundImage: `url(${story.coverImageUrl})` } : undefined
+                  story.coverImageUrl ? { backgroundImage: `url(${mediaUrl(story.coverImageUrl)})` } : undefined
                 }
               >
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/0 to-black/0" />
@@ -262,7 +263,7 @@ function StoryPreviewModal({ story, onClose }: { story: Story; onClose: () => vo
             className="absolute inset-0 bg-cover bg-center bg-slate-800"
             style={
               slide.imageUrl || story.coverImageUrl
-                ? { backgroundImage: `url(${slide.imageUrl || story.coverImageUrl})` }
+                ? { backgroundImage: `url(${mediaUrl(slide.imageUrl || story.coverImageUrl)})` }
                 : undefined
             }
           />

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { mediaUrl } from "@/lib/media-url";
 import {
   Card,
   StatCard,
@@ -272,7 +273,7 @@ export default function OverviewPage() {
                   className={cn(
                     "h-10 w-10 rounded-lg bg-cover bg-center shrink-0 bg-slate-100",
                   )}
-                  style={a.coverImageUrl ? { backgroundImage: `url(${a.coverImageUrl})` } : undefined}
+                  style={a.coverImageUrl ? { backgroundImage: `url(${mediaUrl(a.coverImageUrl)})` } : undefined}
                 />
                 <span className="flex-1 min-w-0">
                   <span className="block text-sm font-medium text-ink truncate">{a.title}</span>

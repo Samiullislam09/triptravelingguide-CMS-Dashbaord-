@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import RichEditor from "@/components/RichEditor";
+import { mediaUrl } from "@/lib/media-url";
 import { Button, Badge, Spinner, cn } from "@/components/ui";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -744,7 +745,7 @@ export default function EditorPage() {
               {(thumbPreview || article.coverImageUrl) && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={thumbPreview || article.coverImageUrl}
+                  src={mediaUrl(thumbPreview || article.coverImageUrl)}
                   alt="Cover preview"
                   className="w-full aspect-[1200/630] object-cover rounded-xl border border-line mb-3 bg-slate-100"
                 />
