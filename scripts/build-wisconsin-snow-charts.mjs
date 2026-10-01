@@ -24,7 +24,7 @@ async function save(name, svg, w, h) {
     ["Madison", 51.8],
     ["Milwaukee", 48.7],
     ["Green Bay", 55.6],
-    ["Hurley (avg. 1987-2010)", 174.4],
+    ["Hurley (avg. 1987-2010)", 174.4], // record season 295.4" in 1996-97 (NWS)
   ];
   const W = 1200, H = 560;
   const L = 260, R = 1140, top = 110, bh = 100;
@@ -81,7 +81,7 @@ function card({ big, sub, foot, from, to }) {
 const cards = [
   ["story-2.jpg", { big: "+4 to +6°F", sub: "NOAA's warmest anomaly range for northern Wisconsin this winter", foot: "NOAA Climate Prediction Center, 2026-2027 outlook", from: "#0b3140", to: "#0e7490" }],
   ["story-3.jpg", { big: "3 forecasts, 3 answers", sub: "NOAA says below normal snow. Farmers' Almanac says above average.", foot: "See the full comparison in the guide.", from: "#052e16", to: "#15803d" }],
-  ["story-4.jpg", { big: "Hurley: 277.7\"", sub: "Wisconsin's seasonal snowfall record, winter 1996-97", foot: "In the Lake Superior snowbelt, northern Wisconsin", from: "#3b0764", to: "#7e22ce" }],
+  ["story-4.jpg", { big: "Hurley: 295.4\"", sub: "Wisconsin's seasonal snowfall record, winter 1996-97", foot: "In the Lake Superior snowbelt, northern Wisconsin", from: "#3b0764", to: "#7e22ce" }],
   ["story-5.jpg", { big: "1991: 32\" in Brule", sub: "The Halloween Blizzard hit western Wisconsin during an El Nino winter too", foot: "A milder seasonal lean is not a guarantee. See the full guide.", from: "#450a0a", to: "#b91c1c" }],
 ];
 for (const [name, c] of cards) await save(name, card(c), 720, 1280);
