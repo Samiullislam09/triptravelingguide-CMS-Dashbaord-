@@ -88,7 +88,7 @@ function card({ big, sub, foot, from, to }) {
 const cards = [
   ["story-2.jpg", { big: "Sep 29: 2\" of snow", sub: "Arizona Snowbowl got real snow months before its scheduled opening", foot: "Scheduled to open Nov 20, possibly earlier", from: "#0b3140", to: "#0e7490" }],
   ["story-3.jpg", { big: "Oct 9: A-Basin", sub: "Arapahoe Basin's projected opening, earliest in Colorado", foot: "CPR, resort announcements, Oct 2026", from: "#052e16", to: "#15803d" }],
-  ["story-4.jpg", { big: "13 resorts, 13 dates", sub: "Colorado's full 2026-2027 opening lineup, Oct 9 to Dec 12", foot: "See the complete list in the guide", from: "#3b0764", to: "#7e22ce" }],
+  ["story-4.jpg", { big: "35+ resorts, every date", sub: "Every 2026-2027 opening date across the US and Canada", foot: "See the complete list in the guide", from: "#3b0764", to: "#7e22ce" }],
   ["story-5.jpg", { big: "Snow before the season", sub: "Levi and Ruka, Finland, already open on stockpiled snow", foot: "A year-round snowmaking trick. See how it works.", from: "#450a0a", to: "#b91c1c" }],
 ];
 for (const [name, c] of cards) await save(name, card(c), 720, 1280);
