@@ -21,17 +21,17 @@ async function save(name, svg, w, h) {
   const W = 1200, H = 420;
   let svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" ${FONT}>
 <rect width="${W}" height="${H}" fill="#ffffff"/>
-<text x="40" y="44" font-size="25" font-weight="700" fill="#111">Colorado's rain/snow split, 14 October 2026</text>
-<text x="40" y="70" font-size="14" fill="#555">Live NWS Winter Weather Advisories vs. Denver's forecast for the same day.</text>
+<text x="40" y="44" font-size="25" font-weight="700" fill="#111">Colorado's rain/snow split, 13-16 October 2026</text>
+<text x="40" y="70" font-size="14" fill="#555">NWS Winter Weather Advisories and I-70 tunnel mapping vs. Denver's forecast for the same days.</text>
 <rect x="40" y="110" width="520" height="260" rx="10" fill="#0ea5e9"/>
 <text x="300" y="220" font-size="22" font-weight="700" fill="#fff" text-anchor="middle">Denver, 5,280 ft</text>
 <text x="300" y="255" font-size="34" font-weight="700" fill="#fff" text-anchor="middle">Rain</text>
 <text x="300" y="285" font-size="16" fill="#e0f2fe" text-anchor="middle">Upper 40s to low 50s</text>
 <rect x="620" y="110" width="540" height="260" rx="10" fill="#1d4ed8"/>
-<text x="890" y="220" font-size="22" font-weight="700" fill="#fff" text-anchor="middle">High country, 9,000+ ft</text>
-<text x="890" y="255" font-size="34" font-weight="700" fill="#fff" text-anchor="middle">4-12 in snow</text>
-<text x="890" y="285" font-size="16" fill="#dbeafe" text-anchor="middle">RMNP, Summit County, San Juans</text>
-<text x="40" y="${H - 18}" font-size="14" fill="#666">Source: NWS active alerts, 14 Oct 2026. Chart: TripTravelingGuide.</text></svg>`;
+<text x="890" y="220" font-size="20" font-weight="700" fill="#fff" text-anchor="middle">I-70 Eisenhower-Johnson Tunnels</text>
+<text x="890" y="255" font-size="34" font-weight="700" fill="#fff" text-anchor="middle">9-16 in snow</text>
+<text x="890" y="285" font-size="16" fill="#dbeafe" text-anchor="middle">Likely vs. high-end NWS scenario</text>
+<text x="40" y="${H - 18}" font-size="14" fill="#666">Source: NWS mapping, Denver Gazette, 13-14 Oct 2026. Chart: TripTravelingGuide.</text></svg>`;
   await save("chart-elevation.jpg", svg, W, H);
 }
 
@@ -46,10 +46,10 @@ function card({ big, sub, foot, from, to }) {
 <text x="360" y="1170" font-size="20" fill="#cfe4f3" text-anchor="middle">${esc(foot)}</text></svg>`;
 }
 const cards = [
-  ["story-2.jpg", { big: "4 to 12 inches", sub: "Forecast for Colorado's high country above 9,000 feet, 14 October 2026", foot: "NWS active alerts, 14 Oct 2026", from: "#0c4a6e", to: "#0ea5e9" }],
-  ["story-3.jpg", { big: "Denver: just rain", sub: "Upper 40s to low 50s on the Front Range while the mountains get snow", foot: "Elevation is the whole story today", from: "#1e3a8a", to: "#3b82f6" }],
-  ["story-4.jpg", { big: "Watch these passes", sub: "Wolf Creek, Rabbit Ears, and the Summit County passes along I-70", foot: "Check COtrip before you drive", from: "#312e81", to: "#6366f1" }],
-  ["story-5.jpg", { big: "A-Basin: not yet", sub: "Colorado's usual first resort to open still has no confirmed date", foot: "See our full ski season guide for every resort", from: "#422006", to: "#b45309" }],
+  ["story-2.jpg", { big: "I-70: 9-16 inches", sub: "Likely vs. high-end NWS scenario at the Eisenhower-Johnson Tunnels by Friday", foot: "NWS mapping, 13-14 Oct 2026", from: "#0c4a6e", to: "#0ea5e9" }],
+  ["story-3.jpg", { big: "Denver: just rain", sub: "Upper 40s to low 50s on the Front Range while the mountains get snow", foot: "Elevation is the whole story this week", from: "#1e3a8a", to: "#3b82f6" }],
+  ["story-4.jpg", { big: "Another storm: Oct 21-22", sub: "Southwest Colorado could see 33 inches combined by October 23", foot: "Longer-range model data, not a confirmed advisory yet", from: "#312e81", to: "#6366f1" }],
+  ["story-5.jpg", { big: "Keystone: opening soon", sub: "Vail Resorts says as soon as possible in October", foot: "See our full ski season guide for every resort", from: "#422006", to: "#b45309" }],
 ];
 for (const [name, c] of cards) await save(name, card(c), 720, 1280);
 
