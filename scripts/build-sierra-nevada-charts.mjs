@@ -19,23 +19,28 @@ async function save(name, svg, w, h) {
 // ---------- chart-opening: resort opening targets ----------
 {
   const rows = [
-    ["Mammoth Mountain", "Fri, 13 Nov 2026"],
-    ["Heavenly", "20 Nov 2026 (target)"],
-    ["Palisades Tahoe", "Wed, 25 Nov 2026"],
+    ["Mt. Rose Ski Tahoe", "Fri, 6 Nov"],
+    ["Mammoth Mountain", "Fri, 13 Nov"],
+    ["Heavenly", "Fri, 20 Nov"],
+    ["Northstar California", "Fri, 20 Nov"],
+    ["Palisades Tahoe", "Wed, 25 Nov"],
+    ["Sugar Bowl", "Fri, 27 Nov"],
+    ["Diamond Peak", "Thu, 3 Dec"],
+    ["Kirkwood", "Fri, 4 Dec"],
   ];
-  const W = 1200, H = 420;
-  const L = 420, top = 110, bh = 90;
+  const W = 1200, H = 760;
+  const L = 420, top = 90, bh = 76;
   let svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" ${FONT}>
 <rect width="${W}" height="${H}" fill="#ffffff"/>
-<text x="40" y="44" font-size="25" font-weight="700" fill="#111">California's 2026-27 opening targets</text>
-<text x="40" y="70" font-size="14" fill="#555">Third-party reporting on resort-announced dates. All subject to snow and snowmaking.</text>`;
+<text x="40" y="40" font-size="24" font-weight="700" fill="#111">California's 2026-27 opening targets</text>
+<text x="40" y="64" font-size="14" fill="#555">Third-party reporting on resort-announced dates. All subject to snow and snowmaking.</text>`;
   rows.forEach(([label, val], i) => {
     const y = top + i * bh;
-    svg += `<text x="${L - 20}" y="${y + 30}" font-size="16" font-weight="700" fill="#111" text-anchor="end">${esc(label)}</text>`;
-    svg += `<rect x="${L}" y="${y}" width="420" height="46" rx="10" fill="#0ea5e9"/>`;
-    svg += `<text x="${L + 210}" y="${y + 30}" font-size="17" font-weight="700" fill="#fff" text-anchor="middle">${esc(val)}</text>`;
+    svg += `<text x="${L - 20}" y="${y + 26}" font-size="16" font-weight="700" fill="#111" text-anchor="end">${esc(label)}</text>`;
+    svg += `<rect x="${L}" y="${y}" width="340" height="38" rx="9" fill="${i === 0 ? "#0369a1" : "#0ea5e9"}"/>`;
+    svg += `<text x="${L + 170}" y="${y + 26}" font-size="16" font-weight="700" fill="#fff" text-anchor="middle">${esc(val)}</text>`;
   });
-  svg += `<text x="40" y="${H - 18}" font-size="14" fill="#666">Source: Unofficial Networks, ABC7 News. Chart: TripTravelingGuide.</text></svg>`;
+  svg += `<text x="40" y="${H - 18}" font-size="14" fill="#666">Source: Sierra Rec Magazine. Chart: TripTravelingGuide.</text></svg>`;
   await save("chart-opening.jpg", svg, W, H);
 }
 
@@ -50,10 +55,10 @@ function card({ big, sub, foot, from, to }) {
 <text x="360" y="1170" font-size="20" fill="#cfe4f3" text-anchor="middle">${esc(foot)}</text></svg>`;
 }
 const cards = [
-  ["story-2.jpg", { big: "The first dusting", sub: "Light snow fell on many Sierra Nevada peaks on October 12, 2026", foot: "OpenSnow, Bryan Allegretto, 13 Oct 2026", from: "#0c4a6e", to: "#0ea5e9" }],
-  ["story-3.jpg", { big: "Mammoth: Nov 13", sub: "The earliest announced California opening this season, lifts at 8:30am", foot: "Last year's date slipped twice", from: "#1e3a8a", to: "#3b82f6" }],
-  ["story-4.jpg", { big: "Heavenly: Nov 20", sub: "Palisades Tahoe: Nov 25, the day before Thanksgiving", foot: "Both targets, not locked in yet", from: "#312e81", to: "#6366f1" }],
-  ["story-5.jpg", { big: "Not the Rockies storm", sub: "A separate West Coast system, same week as Montana, Utah, Wyoming, Colorado", foot: "Both coasts showing winter signs at once", from: "#422006", to: "#b45309" }],
+  ["story-2.jpg", { big: "Sierra-at-Tahoe: first snow", sub: "The only resort with measurable snowfall, October 12, 2026", foot: "A light coating above 6,000 feet elsewhere", from: "#0c4a6e", to: "#0ea5e9" }],
+  ["story-3.jpg", { big: "It's Rachel again", sub: "The same tropical storm remnant that hit Montana, Utah, Wyoming, Colorado", foot: "Fox Weather flagged the Sierra days earlier", from: "#1e3a8a", to: "#3b82f6" }],
+  ["story-4.jpg", { big: "Mt. Rose: Nov 6", sub: "The earliest 2026-27 opening target of any Tahoe resort", foot: "First to fire up snowmaking, too", from: "#312e81", to: "#6366f1" }],
+  ["story-5.jpg", { big: "Won't last long", sub: "Valley highs back in the 80s within days as a dry pattern returns", foot: "This week's coating is a preview, not a base", from: "#422006", to: "#b45309" }],
 ];
 for (const [name, c] of cards) await save(name, card(c), 720, 1280);
 
