@@ -53,10 +53,10 @@ function card({ big, sub, foot, from, to }) {
 <text x="360" y="1170" font-size="20" fill="#cfe4f3" text-anchor="middle">${esc(foot)}</text></svg>`;
 }
 const cards = [
-  ["story-2.jpg", { big: "2WD is covered now", sub: "HB26-1237 closes the gap, effective September 1, 2026", foot: "No more assuming the rule doesn't apply to your car", from: "#0c4a6e", to: "#0ea5e9" }],
-  ["story-3.jpg", { big: "3/16 inch", sub: "Colorado's minimum tire tread, no matter what's driving the wheels", foot: "AWD and 4WD are not a substitute for tires", from: "#1e3a8a", to: "#3b82f6" }],
-  ["story-4.jpg", { big: "Chains always work", sub: "Cable chains or an approved device satisfy the law on any tires", foot: "AutoSock, ISSE Tire Sock, Alpha Trax, EasySox all qualify", from: "#312e81", to: "#6366f1" }],
-  ["story-5.jpg", { big: "$100 to $500", sub: "CDOT's published fine range, higher if you close a lane", foot: "Check codot.gov before you drive, figures vary by source", from: "#422006", to: "#b45309" }],
+  ["story-2.jpg", { big: "No tire-only option", sub: "A CSP trooper says 2WD cars need chains even with good tires", foot: "Snow tires alone don't satisfy the law for 2WD", from: "#0c4a6e", to: "#0ea5e9" }],
+  ["story-3.jpg", { big: "AWD/4WD: tires or chains", sub: "3/16 inch tread, winter or all-weather rated, is the floor", foot: "Bald tires fail no matter how good the drivetrain is", from: "#1e3a8a", to: "#3b82f6" }],
+  ["story-4.jpg", { big: "Rental cars included", sub: "Companies must now warn renters about the traction law", foot: "Renters must comply even if the contract says otherwise", from: "#312e81", to: "#6366f1" }],
+  ["story-5.jpg", { big: "$100 to $500", sub: "The commonly cited fine range, higher if you close a lane", foot: "Figures vary by source, check codot.gov before you drive", from: "#422006", to: "#b45309" }],
 ];
 for (const [name, c] of cards) await save(name, card(c), 720, 1280);
 
