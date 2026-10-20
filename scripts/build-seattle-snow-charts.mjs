@@ -55,7 +55,7 @@ function card({ big, sub, foot, from, to }) {
 <text x="360" y="1170" font-size="20" fill="#cfe4f3" text-anchor="middle">${esc(foot)}</text></svg>`;
 }
 const cards = [
-  ["story-2.jpg", { big: "4.7 days a year", sub: "The NOAA average for measurable snow at Sea-Tac Airport", foot: "Most of those days bring just a dusting", from: "#0c4a6e", to: "#0ea5e9" }],
+  ["story-2.jpg", { big: "6.3 inches a year", sub: "Spread across about 5 days, per NOAA's own normals", foot: "It's the hills, not the snow, that cause the chaos", from: "#0c4a6e", to: "#0ea5e9" }],
   ["story-3.jpg", { big: "Blame the ocean", sub: "The Pacific keeps Seattle's air too mild for snow most winters", foot: "Real snow needs cold air from inland Canada first", from: "#1e3a8a", to: "#3b82f6" }],
   ["story-4.jpg", { big: "The \u201csnow hole\u201d", sub: "The Puget Sound Convergence Zone can snow one neighborhood and skip the next", foot: "Ballard has a reputation for staying dry", from: "#312e81", to: "#6366f1" }],
   ["story-5.jpg", { big: "20.2 inches", sub: "Fell in February 2019, \u201cSnowmageddon,\u201d the snowiest Feb in 50+ years", foot: "Buses stopped running for days", from: "#422006", to: "#b45309" }],
