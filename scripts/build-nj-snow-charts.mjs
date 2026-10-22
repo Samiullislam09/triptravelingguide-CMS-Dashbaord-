@@ -60,6 +60,7 @@ const cards = [
   ["story-3.jpg", { big: "AccuWeather: below average", sub: "NYC 10-20in, Philly 5-15in forecast for 2026-27", foot: "The Almanac is softer: only slightly below normal", from: "#1e3a8a", to: "#3b82f6" }],
   ["story-4.jpg", { big: "17.6in to 32in", sub: "Atlantic City vs Newark, same state, nearly double the snow", foot: "Coastal air changes more storms to rain", from: "#312e81", to: "#6366f1" }],
   ["story-5.jpg", { big: "February, not January", sub: "Newark's real snowiest month, 10.3 inches on average", foot: "Jan and Feb together are 61% of the whole season", from: "#422006", to: "#b45309" }],
+  ["story-6b.jpg", { big: "December 8", sub: "Newark's computed median first-snow date, Nov 20 to Jan 12 typical", foot: "Earliest on record: October 20, 1952", from: "#164e63", to: "#0891b2" }],
 ];
 for (const [name, c] of cards) await save(name, card(c), 720, 1280);
 
